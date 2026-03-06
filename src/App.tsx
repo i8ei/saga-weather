@@ -54,13 +54,13 @@ function getMunicipalityNameFromPath(): string | null {
 }
 
 export default function App() {
-  const { data: municipalities, loading: muniLoading } = useMunicipalities()
+  const { data: municipalities, minDate, loading: muniLoading } = useMunicipalities()
   const [mc, setMc] = useState<string | null>(null)
   const [muniName, setMuniName] = useState<string>("")
   const [realNow, setRealNow] = useState(() => new Date())
   const [range, setRange] = useState<Range>("3m")
   const [metric, setMetric] = useState<Metric>("temp")
-  const [showPrev, setShowPrev] = useState(false)
+  const [showPrev, setShowPrev] = useState(true)
   const [accumFrom, setAccumFrom] = useState<string | null>(null)
   const [accumTo, setAccumTo] = useState<string | null>(null)
 
@@ -195,6 +195,7 @@ export default function App() {
                 cursor: "pointer",
                 padding: 0,
                 appearance: "auto",
+                width: `${muniName.length + 1}em`,
               }}
             >
               {municipalities.map((m) => (
@@ -245,6 +246,7 @@ export default function App() {
           defaultTo={to}
           customFrom={accumFrom}
           customTo={accumTo}
+          minDate={minDate}
           onFromChange={setAccumFrom}
           onToChange={setAccumTo}
         />

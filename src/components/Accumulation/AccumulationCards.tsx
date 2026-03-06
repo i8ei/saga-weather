@@ -23,6 +23,7 @@ interface Props {
   defaultTo: string
   customFrom: string | null
   customTo: string | null
+  minDate: string | null
   onFromChange: (v: string | null) => void
   onToChange: (v: string | null) => void
 }
@@ -37,7 +38,7 @@ const dateInputStyle: React.CSSProperties = {
   colorScheme: "dark",
 }
 
-export default function AccumulationCards({ data, prevData, rangeLabel, defaultFrom, defaultTo, customFrom, customTo, onFromChange, onToChange }: Props) {
+export default function AccumulationCards({ data, prevData, rangeLabel, defaultFrom, defaultTo, customFrom, customTo, minDate, onFromChange, onToChange }: Props) {
   const isCustom = customFrom !== null || customTo !== null
   const activeFrom = customFrom ?? defaultFrom
   const activeTo = customTo ?? defaultTo
@@ -106,6 +107,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
           <input
             type="date"
             value={activeFrom}
+            min={minDate ?? undefined}
             onChange={(e) => onFromChange(e.target.value || null)}
             style={dateInputStyle}
           />
@@ -113,6 +115,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
           <input
             type="date"
             value={activeTo}
+            max={new Date().toISOString().slice(0, 10)}
             onChange={(e) => onToChange(e.target.value || null)}
             style={dateInputStyle}
           />

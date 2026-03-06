@@ -47,16 +47,17 @@ export interface Municipality {
 
 export function useMunicipalities() {
   const [data, setData] = useState<Municipality[]>([])
+  const [minDate, setMinDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/municipalities')
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false) })
+      .then((d) => { setData(d.municipalities); setMinDate(d.minDate); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
-  return { data, loading }
+  return { data, minDate, loading }
 }
 
 export function useForecast(mc?: string) {

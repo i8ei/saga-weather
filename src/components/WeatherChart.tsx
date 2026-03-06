@@ -173,12 +173,7 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
 
   return (
     <section className="card">
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <h2 className="terminal-title mono">この{rangeLabel ?? "期間"}の{config.label}</h2>
-        <span className="mono muted" style={{ fontSize: 11 }}>
-          {rawMin.toFixed(1)}..{rawMax.toFixed(1)} {config.unit}
-        </span>
-      </div>
+      <h2 className="terminal-title mono">この{rangeLabel ?? "期間"}の{config.label}</h2>
 
       <svg
         viewBox={`0 0 ${W} ${H + 6}`}
