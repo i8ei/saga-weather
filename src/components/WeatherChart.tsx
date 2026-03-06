@@ -67,6 +67,8 @@ interface Props {
 export default function WeatherChart({ data, prevData, metric, rangeLabel }: Props) {
   const config = METRIC_CONFIG[metric]
 
+  const prevSufficient = prevData && prevData.length >= data.length * 0.8
+
   const chartData = useMemo(() => {
     if (data.length === 0) return null
 
@@ -75,9 +77,6 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
 
     const values = data.map((d) => config.getValue(d) ?? 0)
     const overlayValues = config.overlay ? data.map((d) => config.overlay!.getValue(d) ?? 0) : null
-
-    // Skip prev data if coverage is less than 80% of current range
-    const prevSufficient = prevData && prevData.length >= data.length * 0.8
 
     // Map previous year data by day offset from range start (leap-year safe)
     const prevMap = new Map<number, number>()
@@ -214,18 +213,25 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
 
     return {
       posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
-      zeroY, rawMin, prevSufficient, prevPath,
+      zeroY, rawMin, prevPath,
     }
   }, [data, prevData, metric, config])
 
   if (!chartData) return null
 
   const { posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
-    zeroY, rawMin, prevSufficient, prevPath } = chartData
+    zeroY, rawMin, prevPath } = chartData
 
   return (
     <section className="card">
-      <h2 className="terminal-title mono">この{rangeLabel ?? "期間"}の{config.label}</h2>
+      <h2 className="terminal-title mono">
+        この{rangeLabel ?? "期間"}の{config.label}
+        {prevSufficient && (
+          <span style={{ fontSize: 10, color: "var(--text-sub)", letterSpacing: 0 }}>
+            （棒=今年 / 線=前年）
+          </span>
+        )}
+      </h2>
 
       <svg
         viewBox={`0 0 ${W} ${H + 6}`}
@@ -295,15 +301,26 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
 
       {/* Legend */}
       {(prevSufficient || config.overlay) && (
-        <div className="row mono muted" style={{ fontSize: 11, marginTop: 4, gap: 12 }}>
+        <div className="row mono muted" style={{
+          fontSize: 12, marginTop: 4, gap: 12,
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid var(--line)",
+          padding: "4px 8px",
+        }}>
           {prevSufficient && prevData && (
             <>
-              <span><span style={{ color: "var(--accent)" }}>■</span> 今年</span>
-              <span><span style={{ color: "#f59e0b" }}>─</span> 前年</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ display: "inline-block", width: 10, height: 8, background: "var(--accent)" }} /> 今年
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ display: "inline-block", width: 14, borderTop: "2px solid #f59e0b" }} /> 前年(7日平均)
+              </span>
             </>
           )}
           {config.overlay && (
-            <span><span style={{ color: config.overlay.color }}>─</span> {config.overlay.label}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ display: "inline-block", width: 14, borderTop: "2px solid " + config.overlay.color }} /> {config.overlay.label}
+            </span>
           )}
         </div>
       )}

@@ -1,4 +1,6 @@
 import type { Accumulation } from '../../hooks/useWeather'
+import Tooltip from '../Tooltip'
+import { evaluateAccum } from '../../lib/weather/evaluators'
 
 function Diff({ curr, prev, unit, invert }: { curr: number; prev: number; unit: string; invert?: boolean }) {
   const diff = curr - prev
@@ -48,9 +50,10 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
   // 前年データの日数が今年の80%未満なら比較に使わない（データ不足）
   const hasPrev = prevData != null && data.days > 0 && prevData.days >= data.days * 0.8
 
-  const rows: { label: string; value: string; unit: string; sub?: string; diffKey?: keyof Accumulation; diffUnit?: string; invert?: boolean }[] = [
+  const rows: { label: string; desc: string; value: string; unit: string; sub?: string; diffKey?: keyof Accumulation; diffUnit?: string; invert?: boolean }[] = [
     {
       label: "積算温度",
+      desc: "日平均気温の合計。生育速度の目安",
       value: data.temp_sum.toLocaleString(),
       unit: "°C",
       diffKey: "temp_sum",
@@ -58,6 +61,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
     },
     {
       label: "有効積算温度",
+      desc: "基準温度超過分の合計。発芽・開花予測に使用",
       value: data.effective_temp_sum.toLocaleString(),
       unit: `°C`,
       sub: `>${data.base_temp}°C`,
@@ -66,6 +70,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
     },
     {
       label: "積算日照",
+      desc: "日照時間の合計。光合成量の目安",
       value: data.sunshine_sum.toLocaleString(),
       unit: "h",
       diffKey: "sunshine_sum",
@@ -73,6 +78,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
     },
     {
       label: "積算降水量",
+      desc: "降水量の合計",
       value: data.precip_sum.toLocaleString(),
       unit: "mm",
       diffKey: "precip_sum",
@@ -80,6 +86,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
     },
     {
       label: "水収支",
+      desc: "降水 − 蒸発散(ET0)。+は湿り、−は乾き",
       value: (data.water_balance >= 0 ? "+" : "") + data.water_balance.toLocaleString(),
       unit: "mm",
       sub: `雨${data.precip_sum} − ET₀${data.et0_sum}`,
@@ -88,6 +95,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
     },
     {
       label: "強風日数",
+      desc: "最大風速8m/s以上の日数",
       value: String(data.strong_wind_days),
       unit: `日/${data.days}日`,
       sub: `≥8 m/s  最大${data.wind_max_peak.toFixed(1)} m/s`,
@@ -133,18 +141,24 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
         {rows.map((r) => (
           <div key={r.label} style={{ padding: "4px 0", borderBottom: "1px solid var(--line)" }}>
             <div className="row" style={{ alignItems: "baseline" }}>
-              <span className="jp">{r.label}</span>
+              <Tooltip text={r.desc}><span className="jp">{r.label}</span></Tooltip>
               <span className="mono muted" style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap" }}>
                 ................................................................
               </span>
               <span className="mono" style={{ color: "var(--accent)" }}>{r.value} {r.unit}</span>
               {hasPrev && prevData && r.diffKey && (
-                <Diff
-                  curr={Number(data[r.diffKey])}
-                  prev={Number(prevData[r.diffKey])}
-                  unit={r.diffUnit ?? r.unit}
-                  invert={r.invert}
-                />
+                <>
+                  <Diff
+                    curr={Number(data[r.diffKey])}
+                    prev={Number(prevData[r.diffKey])}
+                    unit={r.diffUnit ?? r.unit}
+                    invert={r.invert}
+                  />
+                  {(() => {
+                    const ev = evaluateAccum(r.diffKey, data, prevData)
+                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.color }}>{ev.text}</span> : null
+                  })()}
+                </>
               )}
             </div>
             {r.sub && (

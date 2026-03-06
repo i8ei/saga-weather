@@ -4,6 +4,7 @@ import SekkiHeader from "./components/SekkiHeader"
 import ForecastTable from "./components/ForecastTable"
 import AccumulationCards from "./components/Accumulation/AccumulationCards"
 import WeatherChart, { type Metric } from "./components/WeatherChart"
+import WeeklyOutlook from "./components/WeeklyOutlook"
 
 type Range = "1y" | "6m" | "3m" | "1m"
 
@@ -227,6 +228,7 @@ export default function App() {
 
         <SekkiHeader now={realNow} />
         <ForecastTable forecast={forecast} now={realNow} />
+        <WeeklyOutlook forecast={forecast} accum={accum} prevAccum={prevEnabled ? prevAccum : null} />
         <div style={{ display: "flex", gap: 4 }}>
           <button
             className="mono"
