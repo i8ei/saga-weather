@@ -1,4 +1,4 @@
-import * as Astronomy from "astronomy-engine";
+import { MoonPhase, AstroTime } from "astronomy-engine";
 import { getSolarEclipticLongitude, getSekkiFromLongitude, searchSekkiStartDate } from "./astronomy";
 
 // 24節気（小寒から始まる順序）
@@ -71,7 +71,7 @@ export function sekkiStartDate(year: number, sekkiIndex: number): Date {
 }
 
 export function getMoonPhase(d: Date): number {
-  return Astronomy.MoonPhase(new Astronomy.AstroTime(d)) / 360;
+  return MoonPhase(new AstroTime(d)) / 360;
 }
 
 export function moonPhaseIcon(phase: number): string {

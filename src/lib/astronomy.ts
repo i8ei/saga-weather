@@ -1,12 +1,12 @@
-import * as Astronomy from "astronomy-engine";
+import { AstroTime, GeoVector, Body, Ecliptic, SearchSunLongitude, SearchMoonPhase, MoonPhase } from "astronomy-engine";
 
 /**
  * 指定日時の太陽黄経 (0-360°) を計算する
  */
 export function getSolarEclipticLongitude(date: Date): number {
-  const t = new Astronomy.AstroTime(date);
-  const v = Astronomy.GeoVector(Astronomy.Body.Sun, t, true);
-  const ecl = Astronomy.Ecliptic(v);
+  const t = new AstroTime(date);
+  const v = GeoVector(Body.Sun, t, true);
+  const ecl = Ecliptic(v);
   return ((ecl.elon % 360) + 360) % 360;
 }
 
@@ -36,8 +36,8 @@ export function searchSekkiStartDate(year: number, sekkiIndex: number): Date {
   const targetLon = sekkiIndexToLongitude(sekkiIndex);
   const approxMonth = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11];
   const searchStart = new Date(year, approxMonth[sekkiIndex], 1);
-  const startTime = new Astronomy.AstroTime(new Date(searchStart.getTime() - 20 * 86400000));
-  const result = Astronomy.SearchSunLongitude(targetLon, startTime, 60);
+  const startTime = new AstroTime(new Date(searchStart.getTime() - 20 * 86400000));
+  const result = SearchSunLongitude(targetLon, startTime, 60);
   return result!.date;
 }
 
@@ -58,20 +58,20 @@ function collectMoonPhases(
 ): LunarPeak[] {
   const kind: LunarPeakKind = targetLon === 180 ? "full" : "new";
   const peaks: LunarPeak[] = [];
-  let cursor = new Astronomy.AstroTime(startDate);
+  let cursor = new AstroTime(startDate);
   const endMs = startDate.getTime() + limitDays * 86400000;
 
   while (cursor.date.getTime() < endMs) {
-    const result = Astronomy.SearchMoonPhase(targetLon, cursor, limitDays);
+    const result = SearchMoonPhase(targetLon, cursor, limitDays);
     if (!result || result.date.getTime() >= endMs) break;
 
     peaks.push({
       kind,
       peakTime: result.date,
-      elongation: Astronomy.MoonPhase(result),
+      elongation: MoonPhase(result),
     });
 
-    cursor = new Astronomy.AstroTime(new Date(result.date.getTime() + 86400000));
+    cursor = new AstroTime(new Date(result.date.getTime() + 86400000));
   }
 
   return peaks;

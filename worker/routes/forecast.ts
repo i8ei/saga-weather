@@ -13,7 +13,10 @@ app.get("/forecast", async (c) => {
 
   // Check KV cache
   const cached = await c.env.FORECAST_CACHE.get(cacheKey, { type: "json" })
-  if (cached) return c.json(cached)
+  if (cached) {
+    c.header("Cache-Control", "public, max-age=1800")
+    return c.json(cached)
+  }
 
   // Look up municipality lat/lon
   const muni = await c.env.DB.prepare(
@@ -29,6 +32,7 @@ app.get("/forecast", async (c) => {
     expirationTtl: CACHE_TTL,
   })
 
+  c.header("Cache-Control", "public, max-age=1800")
   return c.json(data)
 })
 

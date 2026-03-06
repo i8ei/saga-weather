@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useWeatherDaily, useAccumulation, useForecast, useMunicipalities } from "./hooks/useWeather"
+import { useWeatherBundle, useForecast, useMunicipalities } from "./hooks/useWeather"
 import SekkiHeader from "./components/SekkiHeader"
 import ForecastTable from "./components/ForecastTable"
 import AccumulationCards from "./components/Accumulation/AccumulationCards"
@@ -134,13 +134,11 @@ export default function App() {
   }, [effFrom, effTo])
   const prevEnabled = showPrev && !rangeExceeds1y
 
-  const { data: daily, loading, error: dailyError } = useWeatherDaily(effFrom, effTo, mc ?? undefined)
-  const { data: prevDaily } = useWeatherDaily(prevEnabled ? effPrevFrom : undefined, prevEnabled ? effPrevTo : undefined, mc ?? undefined)
-  const { data: accum } = useAccumulation(effFrom, effTo, mc ?? undefined)
-  const { data: prevAccum } = useAccumulation(prevEnabled ? effPrevFrom : undefined, prevEnabled ? effPrevTo : undefined, mc ?? undefined)
+  const { daily, accum, loading, error: bundleError } = useWeatherBundle(effFrom, effTo, mc ?? undefined)
+  const { daily: prevDaily, accum: prevAccum } = useWeatherBundle(prevEnabled ? effPrevFrom : undefined, prevEnabled ? effPrevTo : undefined, mc ?? undefined)
   const { data: forecast, error: forecastError } = useForecast(mc ?? undefined)
 
-  const error = forecastError || dailyError
+  const error = forecastError || bundleError
 
   const handleMuniChange = (code: string) => {
     const found = municipalities.find((m) => m.code === code)

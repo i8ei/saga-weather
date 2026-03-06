@@ -10,7 +10,8 @@ app.get("/municipalities", async (c) => {
   const oldest = await c.env.DB.prepare(
     "SELECT MIN(date) as min_date FROM daily_weather"
   ).first<{ min_date: string | null }>()
-  return c.json({ municipalities: results, minDate: oldest?.min_date ?? null })
+  c.header("Cache-Control", "public, max-age=86400, s-maxage=86400")
+  return c.json({ municipalities: results.map(m => ({ code: m.code, name: m.name })), minDate: oldest?.min_date ?? null })
 })
 
 export { app as municipalityRoutes }

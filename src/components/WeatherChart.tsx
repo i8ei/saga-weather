@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { DailyWeather } from '../hooks/useWeather'
 
 type Metric = "temp" | "sunshine" | "precip" | "water" | "wind"
@@ -64,111 +65,163 @@ interface Props {
 }
 
 export default function WeatherChart({ data, prevData, metric, rangeLabel }: Props) {
-  if (data.length === 0) return null
-
   const config = METRIC_CONFIG[metric]
-  const values = data.map((d) => config.getValue(d) ?? 0)
-  const overlayValues = config.overlay ? data.map((d) => config.overlay!.getValue(d) ?? 0) : null
 
-  // Skip prev data if coverage is less than 80% of current range
-  const prevSufficient = prevData && prevData.length >= data.length * 0.8
+  const chartData = useMemo(() => {
+    if (data.length === 0) return null
 
-  // Map previous year data by day offset from range start (leap-year safe)
-  const prevMap = new Map<number, number>()
-  if (prevSufficient && prevData) {
-    const prevStart = new Date(prevData[0].date + "T00:00:00").getTime()
-    for (const d of prevData) {
-      const offset = Math.round((new Date(d.date + "T00:00:00").getTime() - prevStart) / 86400000)
-      prevMap.set(offset, config.getValue(d) ?? 0)
-    }
-  }
-  const dataStart = new Date(data[0].date + "T00:00:00").getTime()
-  const prevValues = data.map((d) => {
-    const offset = Math.round((new Date(d.date + "T00:00:00").getTime() - dataStart) / 86400000)
-    return prevMap.get(offset) ?? null
-  })
+    // Parse dates once and cache timestamps
+    const dataTimestamps = data.map((d) => new Date(d.date + "T00:00:00").getTime())
 
-  const prevNonNull = prevSufficient ? prevValues.filter((v): v is number => v !== null) : []
-  const allValues = [...values, ...(overlayValues ?? []), ...prevNonNull]
-  const thresholdValues = config.thresholds?.map((t) => t.value) ?? []
-  const rawMax = Math.max(...allValues, ...thresholdValues, 0.1)
-  const rawMin = config.allowNegativeMin ? Math.min(...allValues, 0) : 0
-  const padding = (rawMax - rawMin) * 0.08
-  const max = rawMax + padding
-  const min = rawMin - (config.allowNegativeMin ? padding : 0)
-  const range = max - min || 1
+    const values = data.map((d) => config.getValue(d) ?? 0)
+    const overlayValues = config.overlay ? data.map((d) => config.overlay!.getValue(d) ?? 0) : null
 
-  const chartW = W - PAD_LEFT
-  const n = values.length
-  const barW = chartW / n
+    // Skip prev data if coverage is less than 80% of current range
+    const prevSufficient = prevData && prevData.length >= data.length * 0.8
 
-  const toY = (v: number) => PAD_TOP + (1 - (v - min) / range) * (H - PAD_TOP - PAD_BOT)
-  const toX = (i: number) => PAD_LEFT + i * barW
-  const zeroY = toY(0)
-
-  // Build SVG bar path for main values
-  const bars = values.map((v, i) => {
-    const x = toX(i)
-    const y = toY(v)
-    const barH = zeroY - y
-    return { x, y: barH >= 0 ? y : zeroY, h: Math.abs(barH), neg: barH < 0 }
-  })
-
-  // Build line path for overlay
-  let overlayPath = ""
-  if (overlayValues) {
-    overlayPath = overlayValues
-      .map((v, i) => `${i === 0 ? "M" : "L"}${toX(i) + barW / 2},${toY(v)}`)
-      .join(" ")
-  }
-
-  // Threshold lines
-  const thLines = config.thresholds?.map((th) => ({
-    y: toY(th.value),
-    label: th.label,
-    value: th.value,
-  })) ?? []
-
-  // Y-axis ticks (3〜5本)
-  const yTickCount = 4
-  const yStep = range / yTickCount
-  const yTicks: { y: number; label: string }[] = []
-  for (let i = 0; i <= yTickCount; i++) {
-    const v = min + yStep * i
-    yTicks.push({ y: toY(v), label: Math.round(v).toString() })
-  }
-
-  // Month labels + 目盛り線（期間に応じて間引き）
-  const allMonths: { x: number; month: number; year: number }[] = []
-  const dateTicks: { x: number; label: string }[] = []
-  let lastMonth = -1
-  data.forEach((d, i) => {
-    const dt = new Date(d.date + "T00:00:00")
-    const m = dt.getMonth()
-    const day = dt.getDate()
-    if (m !== lastMonth) {
-      allMonths.push({ x: toX(i), month: m, year: dt.getFullYear() })
-      lastMonth = m
-    }
-    if (day === 1 || day === 15) {
-      dateTicks.push({ x: toX(i), label: `${day}` })
-    }
-  })
-
-  // 期間の長さに応じてラベル間隔を決定（最大約15ラベル）
-  const totalMonths = allMonths.length
-  const monthStep = totalMonths <= 15 ? 1 : totalMonths <= 30 ? 3 : 6
-  const showYear = totalMonths > 12
-
-  const months: { x: number; label: string }[] = allMonths
-    .filter((_, i) => i % monthStep === 0)
-    .map((m) => {
-      const ml = `${m.month + 1}月`
-      return {
-        x: m.x,
-        label: showYear ? (m.month === 0 ? `'${String(m.year % 100).padStart(2, "0")}` : ml) : ml,
+    // Map previous year data by day offset from range start (leap-year safe)
+    const prevMap = new Map<number, number>()
+    if (prevSufficient && prevData) {
+      const prevStart = new Date(prevData[0].date + "T00:00:00").getTime()
+      for (const d of prevData) {
+        const offset = Math.round((new Date(d.date + "T00:00:00").getTime() - prevStart) / 86400000)
+        prevMap.set(offset, config.getValue(d) ?? 0)
       }
+    }
+    const dataStart = dataTimestamps[0]
+    const prevValues = dataTimestamps.map((ts) => {
+      const offset = Math.round((ts - dataStart) / 86400000)
+      return prevMap.get(offset) ?? null
     })
+
+    const prevNonNull = prevSufficient ? prevValues.filter((v): v is number => v !== null) : []
+    const allValues = [...values, ...(overlayValues ?? []), ...prevNonNull]
+    const thresholdValues = config.thresholds?.map((t) => t.value) ?? []
+    const rawMax = Math.max(...allValues, ...thresholdValues, 0.1)
+    const rawMin = config.allowNegativeMin ? Math.min(...allValues, 0) : 0
+    const padding = (rawMax - rawMin) * 0.08
+    const max = rawMax + padding
+    const min = rawMin - (config.allowNegativeMin ? padding : 0)
+    const range = max - min || 1
+
+    const chartW = W - PAD_LEFT
+    const n = values.length
+    const barW = chartW / n
+
+    const toY = (v: number) => PAD_TOP + (1 - (v - min) / range) * (H - PAD_TOP - PAD_BOT)
+    const toX = (i: number) => PAD_LEFT + i * barW
+    const zeroY = toY(0)
+
+    // Build combined <path> d-strings for positive and negative bars
+    let posPath = ""
+    let negPath = ""
+    for (let i = 0; i < values.length; i++) {
+      const x = toX(i)
+      const y = toY(values[i])
+      const barH = zeroY - y
+      const rectY = barH >= 0 ? y : zeroY
+      const rectH = Math.max(Math.abs(barH), 0.15)
+      const rx = x + barW * 0.1
+      const rw = barW * 0.8
+      const seg = `M${rx},${rectY}h${rw}v${rectH}h${-rw}Z`
+      if (barH < 0) {
+        negPath += seg
+      } else {
+        posPath += seg
+      }
+    }
+
+    // Build line path for overlay
+    let overlayPath = ""
+    if (overlayValues) {
+      overlayPath = overlayValues
+        .map((v, i) => `${i === 0 ? "M" : "L"}${toX(i) + barW / 2},${toY(v)}`)
+        .join(" ")
+    }
+
+    // Threshold lines
+    const thLines = config.thresholds?.map((th) => ({
+      y: toY(th.value),
+      label: th.label,
+      value: th.value,
+    })) ?? []
+
+    // Y-axis ticks (3〜5本)
+    const yTickCount = 4
+    const yStep = range / yTickCount
+    const yTicks: { y: number; label: string }[] = []
+    for (let i = 0; i <= yTickCount; i++) {
+      const v = min + yStep * i
+      yTicks.push({ y: toY(v), label: Math.round(v).toString() })
+    }
+
+    // Month labels + 目盛り線（期間に応じて間引き） — uses cached timestamps
+    const allMonths: { x: number; month: number; year: number }[] = []
+    const dateTicks: { x: number; label: string }[] = []
+    let lastMonth = -1
+    for (let i = 0; i < data.length; i++) {
+      const dt = new Date(dataTimestamps[i])
+      const m = dt.getMonth()
+      const day = dt.getDate()
+      if (m !== lastMonth) {
+        allMonths.push({ x: toX(i), month: m, year: dt.getFullYear() })
+        lastMonth = m
+      }
+      if (day === 1 || day === 15) {
+        dateTicks.push({ x: toX(i), label: `${day}` })
+      }
+    }
+
+    // 期間の長さに応じてラベル間隔を決定（最大約15ラベル）
+    const totalMonths = allMonths.length
+    const monthStep = totalMonths <= 15 ? 1 : totalMonths <= 30 ? 3 : 6
+    const showYear = totalMonths > 12
+
+    const months: { x: number; label: string }[] = allMonths
+      .filter((_, i) => i % monthStep === 0)
+      .map((m) => {
+        const ml = `${m.month + 1}月`
+        return {
+          x: m.x,
+          label: showYear ? (m.month === 0 ? `'${String(m.year % 100).padStart(2, "0")}` : ml) : ml,
+        }
+      })
+
+    // Previous year: 7-day moving average line
+    let prevPath: string | null = null
+    if (prevSufficient && prevData) {
+      const WINDOW = 7
+      const half = Math.floor(WINDOW / 2)
+      const smoothed: (number | null)[] = prevValues.map((_, i) => {
+        let sum = 0, count = 0
+        for (let j = Math.max(0, i - half); j <= Math.min(prevValues.length - 1, i + half); j++) {
+          if (prevValues[j] !== null) { sum += prevValues[j]!; count++ }
+        }
+        return count >= 3 ? sum / count : null
+      })
+      const segments: string[] = []
+      let cmd = "M"
+      for (let i = 0; i < smoothed.length; i++) {
+        const v = smoothed[i]
+        if (v === null) { cmd = "M"; continue }
+        segments.push(`${cmd}${toX(i) + barW / 2},${toY(v)}`)
+        cmd = "L"
+      }
+      if (segments.length > 1) {
+        prevPath = segments.join(" ")
+      }
+    }
+
+    return {
+      posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
+      zeroY, rawMin, prevSufficient, prevPath,
+    }
+  }, [data, prevData, metric, config])
+
+  if (!chartData) return null
+
+  const { posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
+    zeroY, rawMin, prevSufficient, prevPath } = chartData
 
   return (
     <section className="card">
@@ -215,41 +268,15 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
           </g>
         ))}
 
-        {/* Main bars (always full-width) */}
-        {bars.map((b, i) => (
-          <rect key={i}
-            x={b.x + barW * 0.1}
-            y={b.y}
-            width={barW * 0.8}
-            height={Math.max(b.h, 0.15)}
-            fill={b.neg ? "var(--warn)" : "var(--accent)"}
-            opacity={0.75}
-          />
-        ))}
+        {/* Main bars: combined into 2 path elements */}
+        {posPath && <path d={posPath} fill="var(--accent)" opacity={0.75} />}
+        {negPath && <path d={negPath} fill="var(--warn)" opacity={0.75} />}
 
         {/* Previous year: 7-day moving average line */}
-        {prevSufficient && prevData && (() => {
-          const WINDOW = 7
-          const smoothed: (number | null)[] = prevValues.map((_, i) => {
-            let sum = 0, count = 0
-            for (let j = Math.max(0, i - Math.floor(WINDOW / 2)); j <= Math.min(prevValues.length - 1, i + Math.floor(WINDOW / 2)); j++) {
-              if (prevValues[j] !== null) { sum += prevValues[j]!; count++ }
-            }
-            return count >= 3 ? sum / count : null
-          })
-          const segments: string[] = []
-          let cmd = "M"
-          for (let i = 0; i < smoothed.length; i++) {
-            const v = smoothed[i]
-            if (v === null) { cmd = "M"; continue }
-            segments.push(`${cmd}${toX(i) + barW / 2},${toY(v)}`)
-            cmd = "L"
-          }
-          return segments.length > 1 ? (
-            <path d={segments.join(" ")} fill="none"
-              stroke="#f59e0b" strokeWidth={0.3} opacity={0.8} />
-          ) : null
-        })()}
+        {prevPath && (
+          <path d={prevPath} fill="none"
+            stroke="#f59e0b" strokeWidth={0.3} opacity={0.8} />
+        )}
 
         {/* Overlay line */}
         {overlayPath && (
