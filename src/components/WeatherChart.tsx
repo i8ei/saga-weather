@@ -10,6 +10,7 @@ interface MetricDef {
   overlay?: { label: string; color: string; getValue: (d: DailyWeather) => number | null }
   allowNegativeMin?: boolean
   thresholds?: { value: number; label: string }[]
+  clampScale?: boolean  // use 95th percentile for y-axis max to avoid spike compression
 }
 
 const METRIC_CONFIG: Record<Metric, MetricDef> = {
@@ -28,6 +29,7 @@ const METRIC_CONFIG: Record<Metric, MetricDef> = {
     label: "降水量",
     unit: "mm",
     getValue: (d) => d.precip_sum,
+    clampScale: true,
   },
   water: {
     label: "水収支",
@@ -39,6 +41,7 @@ const METRIC_CONFIG: Record<Metric, MetricDef> = {
       getValue: (d) => d.et0,
     },
     allowNegativeMin: true,
+    clampScale: true,
   },
   wind: {
     label: "風速",
@@ -96,8 +99,17 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
     const prevNonNull = prevSufficient ? prevValues.filter((v): v is number => v !== null) : []
     const allValues = [...values, ...(overlayValues ?? []), ...prevNonNull]
     const thresholdValues = config.thresholds?.map((t) => t.value) ?? []
-    const rawMax = Math.max(...allValues, ...thresholdValues, 0.1)
+    let rawMax = Math.max(...allValues, ...thresholdValues, 0.1)
     const rawMin = config.allowNegativeMin ? Math.min(...allValues, 0) : 0
+
+    // Clamp y-axis max to 95th percentile to prevent spike compression
+    if (config.clampScale && allValues.length >= 10) {
+      const sorted = [...allValues].sort((a, b) => a - b)
+      const p95 = sorted[Math.floor(sorted.length * 0.95)]
+      if (p95 > 0 && rawMax > p95 * 1.5) {
+        rawMax = p95 * 1.5
+      }
+    }
     const padding = (rawMax - rawMin) * 0.08
     const max = rawMax + padding
     const min = rawMin - (config.allowNegativeMin ? padding : 0)
@@ -107,7 +119,10 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
     const n = values.length
     const barW = chartW / n
 
-    const toY = (v: number) => PAD_TOP + (1 - (v - min) / range) * (H - PAD_TOP - PAD_BOT)
+    const toY = (v: number) => {
+      const clamped = Math.max(min, Math.min(max, v))
+      return PAD_TOP + (1 - (clamped - min) / range) * (H - PAD_TOP - PAD_BOT)
+    }
     const toX = (i: number) => PAD_LEFT + i * barW
     const zeroY = toY(0)
 
