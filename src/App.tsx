@@ -127,10 +127,17 @@ export default function App() {
     return { prevFrom: toLocalDate(pf), prevTo: toLocalDate(pt) }
   }, [effFrom, effTo])
 
+  // 1年超の期間では前年比を無効化（比較が意味をなさないため）
+  const rangeExceeds1y = useMemo(() => {
+    const ms = new Date(effTo + "T00:00:00").getTime() - new Date(effFrom + "T00:00:00").getTime()
+    return ms > 366 * 86400000
+  }, [effFrom, effTo])
+  const prevEnabled = showPrev && !rangeExceeds1y
+
   const { data: daily, loading, error: dailyError } = useWeatherDaily(effFrom, effTo, mc ?? undefined)
-  const { data: prevDaily } = useWeatherDaily(showPrev ? effPrevFrom : undefined, showPrev ? effPrevTo : undefined, mc ?? undefined)
+  const { data: prevDaily } = useWeatherDaily(prevEnabled ? effPrevFrom : undefined, prevEnabled ? effPrevTo : undefined, mc ?? undefined)
   const { data: accum } = useAccumulation(effFrom, effTo, mc ?? undefined)
-  const { data: prevAccum } = useAccumulation(showPrev ? effPrevFrom : undefined, showPrev ? effPrevTo : undefined, mc ?? undefined)
+  const { data: prevAccum } = useAccumulation(prevEnabled ? effPrevFrom : undefined, prevEnabled ? effPrevTo : undefined, mc ?? undefined)
   const { data: forecast, error: forecastError } = useForecast(mc ?? undefined)
 
   const error = forecastError || dailyError
@@ -206,6 +213,7 @@ export default function App() {
           </h1>
           <span className="jp muted" style={{ fontSize: 12, fontWeight: 400 }}>あめつちのあいだで</span>
         </div>
+        <div className="jp muted" style={{ fontSize: 11 }}>佐賀県20市町から選べます</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {error && (
@@ -224,13 +232,16 @@ export default function App() {
         <div style={{ display: "flex", gap: 4 }}>
           <button
             className="mono"
-            onClick={() => setShowPrev((p) => !p)}
+            onClick={() => !rangeExceeds1y && setShowPrev((p) => !p)}
+            disabled={rangeExceeds1y}
             style={{
               padding: "8px 12px",
               fontSize: 12,
-              color: showPrev ? "#1a1a1a" : "var(--text-sub)",
-              background: showPrev ? "#f59e0b" : "transparent",
-              border: showPrev ? "1px solid #f59e0b" : "1px solid var(--line)",
+              color: rangeExceeds1y ? "var(--text-muted)" : prevEnabled ? "#1a1a1a" : "var(--text-sub)",
+              background: prevEnabled ? "#f59e0b" : "transparent",
+              border: prevEnabled ? "1px solid #f59e0b" : "1px solid var(--line)",
+              opacity: rangeExceeds1y ? 0.4 : 1,
+              cursor: rangeExceeds1y ? "not-allowed" : "pointer",
             }}
           >
             前年比
@@ -240,7 +251,7 @@ export default function App() {
 
         <AccumulationCards
           data={accum}
-          prevData={showPrev ? prevAccum : undefined}
+          prevData={prevEnabled ? prevAccum : undefined}
           rangeLabel={RANGE_STEPS.find((r) => r.key === range)?.label}
           defaultFrom={from}
           defaultTo={to}
@@ -260,7 +271,7 @@ export default function App() {
             読込中...
           </div>
         ) : (
-          <WeatherChart data={daily} prevData={showPrev ? prevDaily : undefined} metric={metric} rangeLabel={isCustomRange ? "指定期間" : RANGE_STEPS.find((r) => r.key === range)?.label} />
+          <WeatherChart data={daily} prevData={prevEnabled ? prevDaily : undefined} metric={metric} rangeLabel={isCustomRange ? "指定期間" : RANGE_STEPS.find((r) => r.key === range)?.label} />
         )}
       </div>
 

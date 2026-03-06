@@ -143,8 +143,8 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
     yTicks.push({ y: toY(v), label: Math.round(v).toString() })
   }
 
-  // Month labels + 1日・15日に目盛り線
-  const months: { x: number; label: string; monthNum: number }[] = []
+  // Month labels + 目盛り線（期間に応じて間引き）
+  const allMonths: { x: number; month: number; year: number }[] = []
   const dateTicks: { x: number; label: string }[] = []
   let lastMonth = -1
   data.forEach((d, i) => {
@@ -152,7 +152,7 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
     const m = dt.getMonth()
     const day = dt.getDate()
     if (m !== lastMonth) {
-      months.push({ x: toX(i), label: `${m + 1}月`, monthNum: m })
+      allMonths.push({ x: toX(i), month: m, year: dt.getFullYear() })
       lastMonth = m
     }
     if (day === 1 || day === 15) {
@@ -160,16 +160,20 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
     }
   })
 
-  // 同じ月名が2回出る場合、2回目に年を付けて区別
-  const seenMonths = new Set<number>()
-  for (const m of months) {
-    if (seenMonths.has(m.monthNum)) {
-      const dt = new Date(data[0].date + "T00:00:00")
-      // 2回目の出現 → 翌年
-      m.label = `${m.monthNum + 1}月'${String((dt.getFullYear() + 1) % 100).padStart(2, "0")}`
-    }
-    seenMonths.add(m.monthNum)
-  }
+  // 期間の長さに応じてラベル間隔を決定（最大約15ラベル）
+  const totalMonths = allMonths.length
+  const monthStep = totalMonths <= 15 ? 1 : totalMonths <= 30 ? 3 : 6
+  const showYear = totalMonths > 12
+
+  const months: { x: number; label: string }[] = allMonths
+    .filter((_, i) => i % monthStep === 0)
+    .map((m) => {
+      const ml = `${m.month + 1}月`
+      return {
+        x: m.x,
+        label: showYear ? (m.month === 0 ? `'${String(m.year % 100).padStart(2, "0")}` : ml) : ml,
+      }
+    })
 
   return (
     <section className="card">
