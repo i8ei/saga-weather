@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import type { DailyWeather } from '../hooks/useWeather'
 
 type Metric = "temp" | "sunshine" | "precip" | "water" | "wind"
@@ -60,6 +60,8 @@ const PAD_LEFT = 10
 const PAD_TOP = 4
 const PAD_BOT = 2
 
+const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"]
+
 interface Props {
   data: DailyWeather[]
   prevData?: DailyWeather[]
@@ -70,9 +72,14 @@ interface Props {
 
 export default function WeatherChart({ data, prevData, normalData, metric, rangeLabel }: Props) {
   const config = METRIC_CONFIG[metric]
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const prevSufficient = prevData && prevData.length >= data.length * 0.8
   const normalSufficient = normalData && normalData.length >= data.length * 0.5
+
+  // Reset selection on data/metric change
+  useEffect(() => { setSelectedIdx(null) }, [data, metric])
 
   const chartData = useMemo(() => {
     if (data.length === 0) return null
@@ -97,6 +104,13 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
       const offset = Math.round((ts - dataStart) / 86400000)
       return prevMap.get(offset) ?? null
     })
+
+    // Normal values mapped by date
+    let normalValues: (number | null)[] = []
+    if (normalSufficient && normalData) {
+      const normalDateMap = new Map(normalData.map(d => [d.date, config.getValue(d) ?? 0]))
+      normalValues = data.map(d => normalDateMap.get(d.date) ?? null)
+    }
 
     const prevNonNull = prevSufficient ? prevValues.filter((v): v is number => v !== null) : []
     const allValues = [...values, ...(overlayValues ?? []), ...prevNonNull]
@@ -231,23 +245,77 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
     const prevPath = (prevSufficient && prevData) ? smoothLine(prevValues) : null
 
     // Normal (multi-year average): 7-day moving average line
-    let normalPath: string | null = null
-    if (normalSufficient && normalData) {
-      const normalDateMap = new Map(normalData.map(d => [d.date, config.getValue(d) ?? 0]))
-      const normalValues = data.map(d => normalDateMap.get(d.date) ?? null)
-      normalPath = smoothLine(normalValues)
-    }
+    const normalPath = (normalSufficient && normalData) ? smoothLine(normalValues) : null
 
     return {
       posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
       zeroY, rawMin, prevPath, normalPath,
+      barW, prevValues, normalValues,
     }
   }, [data, prevData, normalData, metric, config])
+
+  // Click handler: convert pixel coords to bar index
+  const handleSvgClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg || !chartData) return
+    const rect = svg.getBoundingClientRect()
+    const viewBoxX = ((e.clientX - rect.left) / rect.width) * W
+    if (viewBoxX < PAD_LEFT) {
+      setSelectedIdx(null)
+      return
+    }
+    const idx = Math.floor((viewBoxX - PAD_LEFT) / chartData.barW)
+    if (idx < 0 || idx >= data.length) {
+      setSelectedIdx(null)
+      return
+    }
+    setSelectedIdx((prev) => prev === idx ? null : idx)
+  }, [chartData, data.length])
 
   if (!chartData) return null
 
   const { posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
-    zeroY, rawMin, prevPath, normalPath } = chartData
+    zeroY, rawMin, prevPath, normalPath, barW, prevValues, normalValues } = chartData
+
+  // Tooltip content builder
+  const tooltipContent = selectedIdx !== null ? (() => {
+    const d = data[selectedIdx]
+    const dt = new Date(d.date + "T00:00:00")
+    const dayName = DAY_NAMES[dt.getDay()]
+    const dateLabel = `${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}（${dayName}）`
+
+    const lines: string[] = [dateLabel]
+
+    if (metric === "temp") {
+      lines.push(`平均 ${d.temp_mean?.toFixed(1) ?? "—"}°C  最高${d.temp_max?.toFixed(0) ?? "—"}° 最低${d.temp_min?.toFixed(0) ?? "—"}°`)
+    } else if (metric === "sunshine") {
+      lines.push(`日照 ${d.sunshine_h?.toFixed(1) ?? "—"}h`)
+    } else if (metric === "precip") {
+      lines.push(`降水 ${d.precip_sum?.toFixed(1) ?? "—"}mm`)
+    } else if (metric === "water") {
+      const wb = d.precip_sum - (d.et0 ?? 0)
+      lines.push(`水収支 ${wb.toFixed(1)}mm  ET₀ ${d.et0?.toFixed(1) ?? "—"}mm`)
+    } else if (metric === "wind") {
+      lines.push(`最大風速 ${d.wind_max?.toFixed(1) ?? "—"}m/s`)
+    }
+
+    const pv = prevValues[selectedIdx]
+    if (prevSufficient && pv !== null) {
+      lines.push(`前年: ${pv.toFixed(1)}${config.unit}`)
+    }
+    const nv = normalValues[selectedIdx]
+    if (normalSufficient && nv !== null) {
+      lines.push(`平年: ${nv.toFixed(1)}${config.unit}`)
+    }
+
+    return lines
+  })() : null
+
+  // Tooltip horizontal position (percentage of SVG width)
+  const tooltipLeft = selectedIdx !== null
+    ? ((PAD_LEFT + (selectedIdx + 0.5) * barW) / W) * 100
+    : 0
+  const flipLeft = tooltipLeft > 70
 
   return (
     <section className="card">
@@ -260,79 +328,127 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
         )}
       </h2>
 
-      <svg
-        viewBox={`0 0 ${W} ${H + 6}`}
-        style={{ width: "100%", height: "auto", marginTop: 8, display: "block" }}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={`${config.label}チャート（${rangeLabel ?? "期間"}）`}
-      >
-        {/* Y-axis grid + labels */}
-        {yTicks.map((t, i) => (
-          <g key={`y-${i}`}>
-            <line x1={PAD_LEFT} y1={t.y} x2={W} y2={t.y}
+      <div style={{ position: "relative" }}>
+        {/* HTML Tooltip */}
+        {selectedIdx !== null && tooltipContent && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: `${tooltipLeft}%`,
+              transform: flipLeft ? "translateX(-100%)" : "translateX(0)",
+              background: "var(--bg, #1a1a2e)",
+              border: "1px solid var(--accent, #4cc9f0)",
+              borderRadius: 4,
+              padding: "4px 8px",
+              fontSize: 11,
+              lineHeight: 1.5,
+              whiteSpace: "nowrap",
+              zIndex: 10,
+              pointerEvents: "none",
+              color: "var(--text, #e0e0e0)",
+              fontFamily: "monospace",
+            }}
+          >
+            {tooltipContent.map((line, i) => (
+              <div key={i} style={i === 0 ? { fontWeight: "bold", marginBottom: 2 } : (
+                line.startsWith("前年") ? { color: "#f59e0b" } :
+                line.startsWith("平年") ? { color: "#a78bfa" } : {}
+              )}>
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H + 6}`}
+          style={{ width: "100%", height: "auto", marginTop: 8, display: "block", cursor: "crosshair" }}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`${config.label}チャート（${rangeLabel ?? "期間"}）`}
+          onClick={handleSvgClick}
+        >
+          {/* Y-axis grid + labels */}
+          {yTicks.map((t, i) => (
+            <g key={`y-${i}`}>
+              <line x1={PAD_LEFT} y1={t.y} x2={W} y2={t.y}
+                stroke="var(--line)" strokeWidth={0.1} />
+              <text x={PAD_LEFT - 1} y={t.y + 0.8} textAnchor="end"
+                fill="var(--text-sub)" fontSize={1.8}>
+                {t.label}
+              </text>
+            </g>
+          ))}
+
+          {/* Date tick lines (1日・15日) */}
+          {dateTicks.map((t, i) => (
+            <line key={`dt-${i}`} x1={t.x} y1={PAD_TOP} x2={t.x} y2={H - PAD_BOT}
               stroke="var(--line)" strokeWidth={0.1} />
-            <text x={PAD_LEFT - 1} y={t.y + 0.8} textAnchor="end"
-              fill="var(--text-sub)" fontSize={1.8}>
-              {t.label}
+          ))}
+
+          {/* Zero line */}
+          {config.allowNegativeMin && rawMin < 0 && (
+            <line x1={PAD_LEFT} y1={zeroY} x2={W} y2={zeroY}
+              stroke="var(--text-sub)" strokeWidth={0.15} strokeDasharray="0.5,0.5" />
+          )}
+
+          {/* Threshold lines */}
+          {thLines.map((th) => (
+            <g key={th.label}>
+              <line x1={PAD_LEFT} y1={th.y} x2={W} y2={th.y}
+                stroke="var(--warn)" strokeWidth={0.15} strokeDasharray="0.8,0.4" opacity={0.6} />
+              <text x={W - 0.5} y={th.y - 0.5} textAnchor="end"
+                fill="var(--warn)" fontSize={2.2} opacity={0.7}>
+                {th.label} {th.value}{config.unit}
+              </text>
+            </g>
+          ))}
+
+          {/* Main bars: combined into 2 path elements */}
+          {posPath && <path d={posPath} fill="var(--accent)" opacity={0.75} />}
+          {negPath && <path d={negPath} fill="var(--warn)" opacity={0.75} />}
+
+          {/* Selected bar highlight */}
+          {selectedIdx !== null && (
+            <rect
+              x={PAD_LEFT + selectedIdx * barW}
+              y={PAD_TOP}
+              width={barW}
+              height={H - PAD_TOP - PAD_BOT}
+              fill="white"
+              opacity={0.12}
+            />
+          )}
+
+          {/* Previous year: 7-day moving average line */}
+          {prevPath && (
+            <path d={prevPath} fill="none"
+              stroke="#f59e0b" strokeWidth={0.3} opacity={0.8} />
+          )}
+
+          {/* Normal (multi-year average): 7-day moving average line */}
+          {normalPath && (
+            <path d={normalPath} fill="none"
+              stroke="#a78bfa" strokeWidth={0.3} opacity={0.8} />
+          )}
+
+          {/* Overlay line */}
+          {overlayPath && (
+            <path d={overlayPath} fill="none"
+              stroke={config.overlay!.color} strokeWidth={0.4} opacity={0.7} />
+          )}
+
+          {/* Month labels */}
+          {months.map((m, i) => (
+            <text key={i} x={m.x + 0.5} y={H + 4}
+              fill="var(--text-sub)" fontSize={2.2}>
+              {m.label}
             </text>
-          </g>
-        ))}
-
-        {/* Date tick lines (1日・15日) */}
-        {dateTicks.map((t, i) => (
-          <line key={`dt-${i}`} x1={t.x} y1={PAD_TOP} x2={t.x} y2={H - PAD_BOT}
-            stroke="var(--line)" strokeWidth={0.1} />
-        ))}
-
-        {/* Zero line */}
-        {config.allowNegativeMin && rawMin < 0 && (
-          <line x1={PAD_LEFT} y1={zeroY} x2={W} y2={zeroY}
-            stroke="var(--text-sub)" strokeWidth={0.15} strokeDasharray="0.5,0.5" />
-        )}
-
-        {/* Threshold lines */}
-        {thLines.map((th) => (
-          <g key={th.label}>
-            <line x1={PAD_LEFT} y1={th.y} x2={W} y2={th.y}
-              stroke="var(--warn)" strokeWidth={0.15} strokeDasharray="0.8,0.4" opacity={0.6} />
-            <text x={W - 0.5} y={th.y - 0.5} textAnchor="end"
-              fill="var(--warn)" fontSize={2.2} opacity={0.7}>
-              {th.label} {th.value}{config.unit}
-            </text>
-          </g>
-        ))}
-
-        {/* Main bars: combined into 2 path elements */}
-        {posPath && <path d={posPath} fill="var(--accent)" opacity={0.75} />}
-        {negPath && <path d={negPath} fill="var(--warn)" opacity={0.75} />}
-
-        {/* Previous year: 7-day moving average line */}
-        {prevPath && (
-          <path d={prevPath} fill="none"
-            stroke="#f59e0b" strokeWidth={0.3} opacity={0.8} />
-        )}
-
-        {/* Normal (multi-year average): 7-day moving average line */}
-        {normalPath && (
-          <path d={normalPath} fill="none"
-            stroke="#a78bfa" strokeWidth={0.3} opacity={0.8} />
-        )}
-
-        {/* Overlay line */}
-        {overlayPath && (
-          <path d={overlayPath} fill="none"
-            stroke={config.overlay!.color} strokeWidth={0.4} opacity={0.7} />
-        )}
-
-        {/* Month labels */}
-        {months.map((m, i) => (
-          <text key={i} x={m.x + 0.5} y={H + 4}
-            fill="var(--text-sub)" fontSize={2.2}>
-            {m.label}
-          </text>
-        ))}
-      </svg>
+          ))}
+        </svg>
+      </div>
 
       {/* Legend */}
       {(prevSufficient || normalSufficient || config.overlay) && (
