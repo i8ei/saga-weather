@@ -1,0 +1,124 @@
+:root {
+  color-scheme: dark;
+  --bg: #0a0a0a;
+  --card-bg: #111111;
+  --card-border: #2a2a2a;
+  --text: #e9ecef;
+  --text-muted: #9aa0a6;
+  --text-sub: #7f868d;
+  --accent: #00d4ff;
+  --accent-dim: rgba(0, 212, 255, 0.2);
+  --ok: #6ee7b7;
+  --warn: #fca5a5;
+  --line: #2a2a2a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "M PLUS 1 Code", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "BIZ UDPGothic", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mono {
+  font-family: "M PLUS 1 Code", "IBM Plex Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+.jp {
+  font-family: "M PLUS 1 Code", "Hiragino Kaku Gothic ProN", "Hiragino Sans", "BIZ UDPGothic", sans-serif;
+}
+
+.card,
+.card-dark {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.terminal-title {
+  margin: 0;
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.terminal-block {
+  border: 1px solid var(--line);
+  padding: 10px;
+}
+
+/* Range slider */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--line);
+  outline: none;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.range-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}

@@ -1,0 +1,21 @@
+name = "saga-weather"
+main = "worker/index.ts"
+compatibility_date = "2025-12-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "saga-weather-db"
+database_id = "add2e324-8def-4ab9-8735-3d6e9a076926"
+
+[[kv_namespaces]]
+binding = "FORECAST_CACHE"
+id = "1f269f5916b6450aa3807895428a7e26"
+
+[triggers]
+crons = ["0 21 * * *"]
