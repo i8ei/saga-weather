@@ -15,7 +15,33 @@ function Diff({ curr, prev, unit, invert }: { curr: number; prev: number; unit: 
   )
 }
 
-export default function AccumulationCards({ data, prevData, rangeLabel }: { data: Accumulation | null; prevData?: Accumulation | null; rangeLabel?: string }) {
+interface Props {
+  data: Accumulation | null
+  prevData?: Accumulation | null
+  rangeLabel?: string
+  defaultFrom: string
+  defaultTo: string
+  customFrom: string | null
+  customTo: string | null
+  onFromChange: (v: string | null) => void
+  onToChange: (v: string | null) => void
+}
+
+const dateInputStyle: React.CSSProperties = {
+  background: "var(--bg)",
+  border: "1px solid var(--line)",
+  color: "var(--accent)",
+  fontSize: 12,
+  padding: "4px 6px",
+  fontFamily: "inherit",
+  colorScheme: "dark",
+}
+
+export default function AccumulationCards({ data, prevData, rangeLabel, defaultFrom, defaultTo, customFrom, customTo, onFromChange, onToChange }: Props) {
+  const isCustom = customFrom !== null || customTo !== null
+  const activeFrom = customFrom ?? defaultFrom
+  const activeTo = customTo ?? defaultTo
+
   if (!data) return null
 
   // 前年データの日数が今年の80%未満なら比較に使わない（データ不足）
@@ -72,7 +98,34 @@ export default function AccumulationCards({ data, prevData, rangeLabel }: { data
 
   return (
     <section className="card">
-      <h2 className="terminal-title mono">この{rangeLabel ?? "期間"}のまとめ</h2>
+      <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+        <h2 className="terminal-title mono" style={{ marginRight: "auto" }}>
+          {isCustom ? "期間指定" : `この${rangeLabel ?? "期間"}の`}まとめ
+        </h2>
+        <div className="row mono" style={{ gap: 4, fontSize: 12 }}>
+          <input
+            type="date"
+            value={activeFrom}
+            onChange={(e) => onFromChange(e.target.value || null)}
+            style={dateInputStyle}
+          />
+          <span className="muted">〜</span>
+          <input
+            type="date"
+            value={activeTo}
+            onChange={(e) => onToChange(e.target.value || null)}
+            style={dateInputStyle}
+          />
+          {isCustom && (
+            <button
+              onClick={() => { onFromChange(null); onToChange(null) }}
+              style={{ fontSize: 11, padding: "4px 8px", color: "var(--text-sub)", minHeight: 0 }}
+            >
+              ↩
+            </button>
+          )}
+        </div>
+      </div>
       <div className="terminal-block mono" style={{ marginTop: 10 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ padding: "4px 0", borderBottom: "1px solid var(--line)" }}>

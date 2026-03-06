@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react"
 import { useWeatherDaily, useAccumulation, useForecast, useMunicipalities } from "./hooks/useWeather"
 import SekkiHeader from "./components/SekkiHeader"
 import ForecastTable from "./components/ForecastTable"
-import AlertBar from "./components/AlertBar"
 import AccumulationCards from "./components/Accumulation/AccumulationCards"
 import WeatherChart, { type Metric } from "./components/WeatherChart"
 
@@ -62,6 +61,8 @@ export default function App() {
   const [range, setRange] = useState<Range>("3m")
   const [metric, setMetric] = useState<Metric>("temp")
   const [showPrev, setShowPrev] = useState(false)
+  const [accumFrom, setAccumFrom] = useState<string | null>(null)
+  const [accumTo, setAccumTo] = useState<string | null>(null)
 
   // Resolve municipality from URL path
   useEffect(() => {
@@ -113,18 +114,23 @@ export default function App() {
   }, [])
 
   const { from, to } = useMemo(() => computeRange(range), [range])
-  const { prevFrom, prevTo } = useMemo(() => {
-    const pf = new Date(from + "T00:00:00")
-    const pt = new Date(to + "T00:00:00")
+
+  // 積算で期間指定されたらグラフもそれに追従
+  const effFrom = accumFrom ?? from
+  const effTo = accumTo ?? to
+  const isCustomRange = accumFrom !== null || accumTo !== null
+  const { prevFrom: effPrevFrom, prevTo: effPrevTo } = useMemo(() => {
+    const pf = new Date(effFrom + "T00:00:00")
+    const pt = new Date(effTo + "T00:00:00")
     pf.setFullYear(pf.getFullYear() - 1)
     pt.setFullYear(pt.getFullYear() - 1)
     return { prevFrom: toLocalDate(pf), prevTo: toLocalDate(pt) }
-  }, [from, to])
+  }, [effFrom, effTo])
 
-  const { data: daily, loading, error: dailyError } = useWeatherDaily(from, to, mc ?? undefined)
-  const { data: prevDaily } = useWeatherDaily(showPrev ? prevFrom : undefined, showPrev ? prevTo : undefined, mc ?? undefined)
-  const { data: accum } = useAccumulation(from, to, mc ?? undefined)
-  const { data: prevAccum } = useAccumulation(showPrev ? prevFrom : undefined, showPrev ? prevTo : undefined, mc ?? undefined)
+  const { data: daily, loading, error: dailyError } = useWeatherDaily(effFrom, effTo, mc ?? undefined)
+  const { data: prevDaily } = useWeatherDaily(showPrev ? effPrevFrom : undefined, showPrev ? effPrevTo : undefined, mc ?? undefined)
+  const { data: accum } = useAccumulation(effFrom, effTo, mc ?? undefined)
+  const { data: prevAccum } = useAccumulation(showPrev ? effPrevFrom : undefined, showPrev ? effPrevTo : undefined, mc ?? undefined)
   const { data: forecast, error: forecastError } = useForecast(mc ?? undefined)
 
   const error = forecastError || dailyError
@@ -214,8 +220,6 @@ export default function App() {
 
         <SekkiHeader now={realNow} />
         <ForecastTable forecast={forecast} now={realNow} />
-        <AlertBar forecast={forecast} />
-
         <div style={{ display: "flex", gap: 4 }}>
           <button
             className="mono"
@@ -230,10 +234,20 @@ export default function App() {
           >
             前年比
           </button>
-          {RANGE_STEPS.map((r) => pillBtn(range === r.key, () => setRange(r.key), r.label))}
+          {RANGE_STEPS.map((r) => pillBtn(range === r.key && !isCustomRange, () => { setRange(r.key); setAccumFrom(null); setAccumTo(null) }, r.label))}
         </div>
 
-        <AccumulationCards data={accum} prevData={showPrev ? prevAccum : undefined} rangeLabel={RANGE_STEPS.find((r) => r.key === range)?.label} />
+        <AccumulationCards
+          data={accum}
+          prevData={showPrev ? prevAccum : undefined}
+          rangeLabel={RANGE_STEPS.find((r) => r.key === range)?.label}
+          defaultFrom={from}
+          defaultTo={to}
+          customFrom={accumFrom}
+          customTo={accumTo}
+          onFromChange={setAccumFrom}
+          onToChange={setAccumTo}
+        />
 
         <div style={{ display: "flex", gap: 4 }}>
           {METRICS.map((m) => pillBtn(metric === m.key, () => setMetric(m.key), m.label))}
@@ -244,7 +258,7 @@ export default function App() {
             読込中...
           </div>
         ) : (
-          <WeatherChart data={daily} prevData={showPrev ? prevDaily : undefined} metric={metric} rangeLabel={RANGE_STEPS.find((r) => r.key === range)?.label} />
+          <WeatherChart data={daily} prevData={showPrev ? prevDaily : undefined} metric={metric} rangeLabel={isCustomRange ? "指定期間" : RANGE_STEPS.find((r) => r.key === range)?.label} />
         )}
       </div>
 
