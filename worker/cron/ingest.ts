@@ -55,9 +55,9 @@ export async function ingest(env: Env) {
   }
   console.log(`Upserted ${stmts.length} rows for ${munis.length} municipalities`)
 
-  // 5. Prune old data (>730 days)
+  // 5. Prune old data (>5 years)
   const pruned = await env.DB.prepare(
-    "DELETE FROM daily_weather WHERE date < date('now', '-730 days')"
+    "DELETE FROM daily_weather WHERE date < date('now', '-1825 days')"
   ).run()
   if (pruned.meta.changes > 0) {
     console.log(`Pruned ${pruned.meta.changes} old rows`)
