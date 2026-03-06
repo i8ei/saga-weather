@@ -1,15 +1,12 @@
 import type { Env, Municipality } from "../lib/types"
 import { fetchDailyRangeMulti } from "../lib/open-meteo"
+import { todayJST, daysAgoJST } from "../lib/date"
 
 const BATCH_SIZE = 100
 
 export async function ingest(env: Env) {
-  const today = new Date()
-  const weekAgo = new Date(today)
-  weekAgo.setDate(weekAgo.getDate() - 7)
-
-  const toStr = today.toISOString().slice(0, 10)
-  const fromStr = weekAgo.toISOString().slice(0, 10)
+  const toStr = todayJST()
+  const fromStr = daysAgoJST(7)
 
   // 1. Get all municipalities
   const { results: munis } = await env.DB.prepare(

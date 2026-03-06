@@ -1,7 +1,9 @@
 import { Hono } from "hono"
 import type { Env, DailyWeatherRow } from "../lib/types"
+import { todayJST, daysAgoJST, isValidDate, daysBetween } from "../lib/date"
 
 const DEFAULT_MC = "41441" // 太良町
+const MAX_RANGE_DAYS = 1900 // 5年+余裕
 
 const app = new Hono<{ Bindings: Env }>()
 
@@ -19,11 +21,8 @@ function convertWind(rows: DailyWeatherRow[]) {
 // GET /latest?mc=
 app.get("/latest", async (c) => {
   const mc = getMc(c)
-  const today = new Date()
-  const weekAgo = new Date(today)
-  weekAgo.setDate(weekAgo.getDate() - 7)
-  const toStr = today.toISOString().slice(0, 10)
-  const fromStr = weekAgo.toISOString().slice(0, 10)
+  const toStr = todayJST()
+  const fromStr = daysAgoJST(7)
   const { results } = await c.env.DB.prepare(
     "SELECT * FROM daily_weather WHERE municipality_code = ? AND date >= ? AND date <= ? ORDER BY date"
   ).bind(mc, fromStr, toStr).all<DailyWeatherRow>()
@@ -35,6 +34,10 @@ app.get("/daily", async (c) => {
   const mc = getMc(c)
   const from = c.req.query("from")
   const to = c.req.query("to")
+  if (from && to) {
+    if (!isValidDate(from) || !isValidDate(to)) return c.json({ error: "Invalid date format" }, 400)
+    if (daysBetween(from, to) > MAX_RANGE_DAYS) return c.json({ error: "Range too large" }, 400)
+  }
   let results: DailyWeatherRow[]
   if (from && to) {
     const r = await c.env.DB.prepare(
@@ -53,11 +56,13 @@ app.get("/daily", async (c) => {
 // GET /accumulation?mc=&from=&to=&base_temp=
 app.get("/accumulation", async (c) => {
   const mc = getMc(c)
-  const today = new Date().toISOString().slice(0, 10)
-  const year = new Date().getFullYear()
+  const today = todayJST()
+  const year = parseInt(today.slice(0, 4))
   const end = c.req.query("to") || today
   const start = c.req.query("from") || `${year}-01-01`
-  const baseTemp = parseFloat(c.req.query("base_temp") || "10")
+  if (!isValidDate(start) || !isValidDate(end)) return c.json({ error: "Invalid date format" }, 400)
+  if (daysBetween(start, end) > MAX_RANGE_DAYS) return c.json({ error: "Range too large" }, 400)
+  const baseTemp = Math.max(0, Math.min(30, parseFloat(c.req.query("base_temp") || "10")))
   const strongWindThKmh = 28.8
 
   const row = await c.env.DB.prepare(`

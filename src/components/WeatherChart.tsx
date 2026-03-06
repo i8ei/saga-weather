@@ -50,10 +50,6 @@ const METRIC_CONFIG: Record<Metric, MetricDef> = {
   },
 }
 
-function toMMDD(d: Date): string {
-  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-}
-
 const W = 100
 const H = 55
 const PAD_LEFT = 10
@@ -77,20 +73,19 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
   // Skip prev data if coverage is less than 80% of current range
   const prevSufficient = prevData && prevData.length >= data.length * 0.8
 
-  // Map previous year data to current year dates (month-day alignment)
-  const prevMap = new Map<string, number>()
+  // Map previous year data by day offset from range start (leap-year safe)
+  const prevMap = new Map<number, number>()
   if (prevSufficient && prevData) {
+    const prevStart = new Date(prevData[0].date + "T00:00:00").getTime()
     for (const d of prevData) {
-      const dt = new Date(d.date + "T00:00:00")
-      // Shift to current year equivalent: add 1 year
-      dt.setFullYear(dt.getFullYear() + 1)
-      const key = toMMDD(dt)
-      prevMap.set(key, config.getValue(d) ?? 0)
+      const offset = Math.round((new Date(d.date + "T00:00:00").getTime() - prevStart) / 86400000)
+      prevMap.set(offset, config.getValue(d) ?? 0)
     }
   }
+  const dataStart = new Date(data[0].date + "T00:00:00").getTime()
   const prevValues = data.map((d) => {
-    const dt = new Date(d.date + "T00:00:00")
-    return prevMap.get(toMMDD(dt)) ?? null
+    const offset = Math.round((new Date(d.date + "T00:00:00").getTime() - dataStart) / 86400000)
+    return prevMap.get(offset) ?? null
   })
 
   const prevNonNull = prevSufficient ? prevValues.filter((v): v is number => v !== null) : []

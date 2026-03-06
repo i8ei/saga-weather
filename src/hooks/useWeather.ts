@@ -49,15 +49,18 @@ export function useMunicipalities() {
   const [data, setData] = useState<Municipality[]>([])
   const [minDate, setMinDate] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/municipalities')
-      .then((r) => r.json())
+    const ac = new AbortController()
+    fetch('/api/municipalities', { signal: ac.signal })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((d) => { setData(d.municipalities); setMinDate(d.minDate); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false) } })
+    return () => ac.abort()
   }, [])
 
-  return { data, minDate, loading }
+  return { data, minDate, loading, error }
 }
 
 export function useForecast(mc?: string) {
@@ -69,11 +72,13 @@ export function useForecast(mc?: string) {
     if (!mc) return
     setLoading(true)
     setError(null)
+    const ac = new AbortController()
     const params = new URLSearchParams({ mc })
-    fetch(`/api/weather/forecast?${params}`)
+    fetch(`/api/weather/forecast?${params}`, { signal: ac.signal })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((d) => { setData(d); setLoading(false) })
-      .catch((e) => { setError(e.message); setLoading(false) })
+      .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false) } })
+    return () => ac.abort()
   }, [mc])
 
   return { data, error, loading }
@@ -88,11 +93,13 @@ export function useWeatherDaily(from?: string, to?: string, mc?: string) {
     if (!from || !to || !mc) { setLoading(false); return }
     setLoading(true)
     setError(null)
+    const ac = new AbortController()
     const params = new URLSearchParams({ from, to, mc })
-    fetch(`/api/weather/daily?${params}`)
+    fetch(`/api/weather/daily?${params}`, { signal: ac.signal })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((d) => { setData(d); setLoading(false) })
-      .catch((e) => { setError(e.message); setLoading(false) })
+      .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false) } })
+    return () => ac.abort()
   }, [from, to, mc])
 
   return { data, error, loading }
@@ -105,11 +112,15 @@ export function useWeatherLatest(mc?: string) {
 
   useEffect(() => {
     if (!mc) return
+    setLoading(true)
+    setError(null)
+    const ac = new AbortController()
     const params = new URLSearchParams({ mc })
-    fetch(`/api/weather/latest?${params}`)
+    fetch(`/api/weather/latest?${params}`, { signal: ac.signal })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((d) => { setData(d); setLoading(false) })
-      .catch((e) => { setError(e.message); setLoading(false) })
+      .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false) } })
+    return () => ac.abort()
   }, [mc])
 
   return { data, error, loading }
@@ -128,10 +139,12 @@ export function useAccumulation(from?: string, to?: string, mc?: string) {
     params.set('mc', mc)
     if (from) params.set('from', from)
     if (to) params.set('to', to)
-    fetch(`/api/weather/accumulation?${params}`)
+    const ac = new AbortController()
+    fetch(`/api/weather/accumulation?${params}`, { signal: ac.signal })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((d) => { setData(d); setLoading(false) })
-      .catch((e) => { setError(e.message); setLoading(false) })
+      .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false) } })
+    return () => ac.abort()
   }, [from, to, mc])
 
   return { data, error, loading }

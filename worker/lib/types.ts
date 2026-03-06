@@ -2,6 +2,7 @@ export interface Env {
   DB: D1Database
   FORECAST_CACHE: KVNamespace
   ASSETS: Fetcher
+  ADMIN_KEY: string
 }
 
 export interface Municipality {
