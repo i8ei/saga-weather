@@ -63,14 +63,16 @@ const PAD_BOT = 2
 interface Props {
   data: DailyWeather[]
   prevData?: DailyWeather[]
+  normalData?: DailyWeather[]
   metric: Metric
   rangeLabel?: string
 }
 
-export default function WeatherChart({ data, prevData, metric, rangeLabel }: Props) {
+export default function WeatherChart({ data, prevData, normalData, metric, rangeLabel }: Props) {
   const config = METRIC_CONFIG[metric]
 
   const prevSufficient = prevData && prevData.length >= data.length * 0.8
+  const normalSufficient = normalData && normalData.length >= data.length * 0.5
 
   const chartData = useMemo(() => {
     if (data.length === 0) return null
@@ -201,15 +203,14 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
         }
       })
 
-    // Previous year: 7-day moving average line
-    let prevPath: string | null = null
-    if (prevSufficient && prevData) {
+    // 7-day moving average line helper
+    function smoothLine(rawValues: (number | null)[]): string | null {
       const WINDOW = 7
       const half = Math.floor(WINDOW / 2)
-      const smoothed: (number | null)[] = prevValues.map((_, i) => {
+      const smoothed: (number | null)[] = rawValues.map((_, i) => {
         let sum = 0, count = 0
-        for (let j = Math.max(0, i - half); j <= Math.min(prevValues.length - 1, i + half); j++) {
-          if (prevValues[j] !== null) { sum += prevValues[j]!; count++ }
+        for (let j = Math.max(0, i - half); j <= Math.min(rawValues.length - 1, i + half); j++) {
+          if (rawValues[j] !== null) { sum += rawValues[j]!; count++ }
         }
         return count >= 3 ? sum / count : null
       })
@@ -221,29 +222,38 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
         segments.push(`${cmd}${toX(i) + barW / 2},${toY(v)}`)
         cmd = "L"
       }
-      if (segments.length > 1) {
-        prevPath = segments.join(" ")
-      }
+      return segments.length > 1 ? segments.join(" ") : null
+    }
+
+    // Previous year: 7-day moving average line
+    const prevPath = (prevSufficient && prevData) ? smoothLine(prevValues) : null
+
+    // Normal (multi-year average): 7-day moving average line
+    let normalPath: string | null = null
+    if (normalSufficient && normalData) {
+      const normalDateMap = new Map(normalData.map(d => [d.date, config.getValue(d) ?? 0]))
+      const normalValues = data.map(d => normalDateMap.get(d.date) ?? null)
+      normalPath = smoothLine(normalValues)
     }
 
     return {
       posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
-      zeroY, rawMin, prevPath,
+      zeroY, rawMin, prevPath, normalPath,
     }
-  }, [data, prevData, metric, config])
+  }, [data, prevData, normalData, metric, config])
 
   if (!chartData) return null
 
   const { posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
-    zeroY, rawMin, prevPath } = chartData
+    zeroY, rawMin, prevPath, normalPath } = chartData
 
   return (
     <section className="card">
       <h2 className="terminal-title mono">
         この{rangeLabel ?? "期間"}の{config.label}
-        {prevSufficient && (
+        {(prevSufficient || normalSufficient) && (
           <span style={{ fontSize: 10, color: "var(--text-sub)", letterSpacing: 0 }}>
-            （棒=今年 / 線=前年）
+            （棒=今年{prevSufficient ? " / 橙線=前年" : ""}{normalSufficient ? " / 紫線=平年" : ""}）
           </span>
         )}
       </h2>
@@ -299,6 +309,12 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
             stroke="#f59e0b" strokeWidth={0.3} opacity={0.8} />
         )}
 
+        {/* Normal (multi-year average): 7-day moving average line */}
+        {normalPath && (
+          <path d={normalPath} fill="none"
+            stroke="#a78bfa" strokeWidth={0.3} opacity={0.8} />
+        )}
+
         {/* Overlay line */}
         {overlayPath && (
           <path d={overlayPath} fill="none"
@@ -315,22 +331,27 @@ export default function WeatherChart({ data, prevData, metric, rangeLabel }: Pro
       </svg>
 
       {/* Legend */}
-      {(prevSufficient || config.overlay) && (
+      {(prevSufficient || normalSufficient || config.overlay) && (
         <div className="row mono muted" style={{
           fontSize: 12, marginTop: 4, gap: 12,
           background: "rgba(255,255,255,0.03)",
           border: "1px solid var(--line)",
           padding: "4px 8px",
         }}>
+          {(prevSufficient || normalSufficient) && (
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ display: "inline-block", width: 10, height: 8, background: "var(--accent)" }} /> 今年
+            </span>
+          )}
           {prevSufficient && prevData && (
-            <>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ display: "inline-block", width: 10, height: 8, background: "var(--accent)" }} /> 今年
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ display: "inline-block", width: 14, borderTop: "2px solid #f59e0b" }} /> 前年(7日平均)
-              </span>
-            </>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ display: "inline-block", width: 14, borderTop: "2px solid #f59e0b" }} /> 前年(7日平均)
+            </span>
+          )}
+          {normalSufficient && normalData && (
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ display: "inline-block", width: 14, borderTop: "2px solid #a78bfa" }} /> 平年(7日平均)
+            </span>
           )}
           {config.overlay && (
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>

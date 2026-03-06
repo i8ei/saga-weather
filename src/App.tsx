@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { useWeatherBundle, useForecast, useMunicipalities } from "./hooks/useWeather"
+import { useWeatherBundle, useWeatherNormal, useForecast, useMunicipalities } from "./hooks/useWeather"
 import SekkiHeader from "./components/SekkiHeader"
 import ForecastTable from "./components/ForecastTable"
 import AccumulationCards from "./components/Accumulation/AccumulationCards"
@@ -62,6 +62,7 @@ export default function App() {
   const [range, setRange] = useState<Range>("3m")
   const [metric, setMetric] = useState<Metric>("temp")
   const [showPrev, setShowPrev] = useState(true)
+  const [showNormal, setShowNormal] = useState(false)
   const [accumFrom, setAccumFrom] = useState<string | null>(null)
   const [accumTo, setAccumTo] = useState<string | null>(null)
 
@@ -134,9 +135,11 @@ export default function App() {
     return ms > 366 * 86400000
   }, [effFrom, effTo])
   const prevEnabled = showPrev && !rangeExceeds1y
+  const normalEnabled = showNormal && !rangeExceeds1y
 
   const { daily, accum, loading, error: bundleError } = useWeatherBundle(effFrom, effTo, mc ?? undefined)
   const { daily: prevDaily, accum: prevAccum } = useWeatherBundle(prevEnabled ? effPrevFrom : undefined, prevEnabled ? effPrevTo : undefined, mc ?? undefined)
+  const { data: normalData } = useWeatherNormal(normalEnabled ? effFrom : undefined, normalEnabled ? effTo : undefined, mc ?? undefined)
   const { data: forecast, error: forecastError } = useForecast(mc ?? undefined)
 
   const error = forecastError || bundleError
@@ -228,7 +231,7 @@ export default function App() {
 
         <SekkiHeader now={realNow} />
         <ForecastTable forecast={forecast} now={realNow} />
-        <WeeklyOutlook forecast={forecast} accum={accum} prevAccum={prevEnabled ? prevAccum : null} />
+        <WeeklyOutlook forecast={forecast} accum={accum} prevAccum={prevEnabled ? prevAccum : null} normalAccum={normalEnabled && normalData ? normalData.accumulation : null} />
         <div style={{ display: "flex", gap: 4 }}>
           <button
             className="mono"
@@ -246,12 +249,29 @@ export default function App() {
           >
             前年比
           </button>
+          <button
+            className="mono"
+            onClick={() => !rangeExceeds1y && setShowNormal((p) => !p)}
+            disabled={rangeExceeds1y}
+            style={{
+              padding: "8px 12px",
+              fontSize: 12,
+              color: rangeExceeds1y ? "var(--text-muted)" : normalEnabled ? "#1a1a1a" : "var(--text-sub)",
+              background: normalEnabled ? "#a78bfa" : "transparent",
+              border: normalEnabled ? "1px solid #a78bfa" : "1px solid var(--line)",
+              opacity: rangeExceeds1y ? 0.4 : 1,
+              cursor: rangeExceeds1y ? "not-allowed" : "pointer",
+            }}
+          >
+            平年比
+          </button>
           {RANGE_STEPS.map((r) => pillBtn(range === r.key && !isCustomRange, () => { setRange(r.key); setAccumFrom(null); setAccumTo(null) }, r.label))}
         </div>
 
         <AccumulationCards
           data={accum}
           prevData={prevEnabled ? prevAccum : undefined}
+          normalData={normalEnabled && normalData ? normalData.accumulation : undefined}
           rangeLabel={RANGE_STEPS.find((r) => r.key === range)?.label}
           defaultFrom={from}
           defaultTo={to}
@@ -271,7 +291,7 @@ export default function App() {
             読込中...
           </div>
         ) : (
-          <WeatherChart data={daily} prevData={prevEnabled ? prevDaily : undefined} metric={metric} rangeLabel={isCustomRange ? "指定期間" : RANGE_STEPS.find((r) => r.key === range)?.label} />
+          <WeatherChart data={daily} prevData={prevEnabled ? prevDaily : undefined} normalData={normalEnabled && normalData ? normalData.daily : undefined} metric={metric} rangeLabel={isCustomRange ? "指定期間" : RANGE_STEPS.find((r) => r.key === range)?.label} />
         )}
       </div>
 

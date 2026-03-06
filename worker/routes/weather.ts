@@ -159,4 +159,124 @@ app.get("/bundle", async (c) => {
   })
 })
 
+/** YYYY-MM-DD を offset 年ずらす（うるう日は2/28に丸める） */
+function shiftDateYear(dateStr: string, offset: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number)
+  const ty = y + offset
+  const maxDay = new Date(ty, m, 0).getDate()
+  return `${ty}-${String(m).padStart(2, "0")}-${String(Math.min(d, maxDay)).padStart(2, "0")}`
+}
+
+// GET /normal?mc=&from=&to=&base_temp= — 過去5年平均（前年除く）
+app.get("/normal", async (c) => {
+  const mc = getMc(c)
+  const today = todayJST()
+  const year = parseInt(today.slice(0, 4))
+  const end = c.req.query("to") || today
+  const start = c.req.query("from") || `${year}-01-01`
+  if (!isValidDate(start) || !isValidDate(end)) return c.json({ error: "Invalid date format" }, 400)
+  if (daysBetween(start, end) > MAX_RANGE_DAYS) return c.json({ error: "Range too large" }, 400)
+  const baseTemp = Math.max(0, Math.min(30, parseFloat(c.req.query("base_temp") || "10")))
+
+  // Years -2 to -5 (skip -1 = previous year)
+  const ranges: { from: string; to: string; offset: number }[] = []
+  for (let off = 2; off <= 5; off++) {
+    ranges.push({ from: shiftDateYear(start, -off), to: shiftDateYear(end, -off), offset: off })
+  }
+
+  // Single query to fetch all years' data
+  const conditions = ranges.map((_, i) => `(date >= ?${i * 2 + 2} AND date <= ?${i * 2 + 3})`).join(" OR ")
+  const binds: (string | number)[] = [mc]
+  for (const r of ranges) { binds.push(r.from, r.to) }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT ${DAILY_COLS} FROM daily_weather WHERE municipality_code = ?1 AND (${conditions}) ORDER BY date`
+  ).bind(...binds).all<DailyWeatherRow>()
+
+  // Group by year offset
+  const yearGroups = new Map<number, DailyWeatherRow[]>()
+  for (const row of results) {
+    for (const r of ranges) {
+      if (row.date >= r.from && row.date <= r.to) {
+        if (!yearGroups.has(r.offset)) yearGroups.set(r.offset, [])
+        yearGroups.get(r.offset)!.push(row)
+        break
+      }
+    }
+  }
+
+  const totalDays = daysBetween(start, end) + 1
+  const minCoverage = totalDays * 0.5
+
+  interface YearAccum { temp_sum: number; sunshine_sum: number; precip_sum: number; effective_temp_sum: number; et0_sum: number; wind_max_peak: number; wind_max_sum: number; strong_wind_days: number; days: number }
+  const validAccums: YearAccum[] = []
+  const dayValues = new Map<number, { temp_mean: number[]; temp_max: number[]; temp_min: number[]; precip_sum: number[]; sunshine_h: number[]; et0: number[]; wind_max: number[] }>()
+
+  for (const [offset, rows] of yearGroups) {
+    if (rows.length < minCoverage) continue
+    const rangeStart = ranges.find(r => r.offset === offset)!.from
+    const startMs = Date.parse(rangeStart + "T00:00:00Z")
+
+    const a: YearAccum = { temp_sum: 0, sunshine_sum: 0, precip_sum: 0, effective_temp_sum: 0, et0_sum: 0, wind_max_peak: 0, wind_max_sum: 0, strong_wind_days: 0, days: rows.length }
+
+    for (const row of rows) {
+      const tm = row.temp_mean ?? 0, ps = row.precip_sum ?? 0, sh = row.sunshine_h ?? 0
+      const et = row.et0 ?? 0, wm = row.wind_max ?? 0
+      a.temp_sum += tm; a.sunshine_sum += sh; a.precip_sum += ps
+      a.effective_temp_sum += Math.max(0, tm - baseTemp)
+      a.et0_sum += et
+      if (wm > a.wind_max_peak) a.wind_max_peak = wm
+      a.wind_max_sum += wm
+      if (wm >= 8) a.strong_wind_days++
+
+      const dayOff = Math.round((Date.parse(row.date + "T00:00:00Z") - startMs) / 86400000)
+      if (!dayValues.has(dayOff)) {
+        dayValues.set(dayOff, { temp_mean: [], temp_max: [], temp_min: [], precip_sum: [], sunshine_h: [], et0: [], wind_max: [] })
+      }
+      const dv = dayValues.get(dayOff)!
+      dv.temp_mean.push(tm); dv.temp_max.push(row.temp_max ?? 0); dv.temp_min.push(row.temp_min ?? 0)
+      dv.precip_sum.push(ps); dv.sunshine_h.push(sh); dv.et0.push(et); dv.wind_max.push(wm)
+    }
+    validAccums.push(a)
+  }
+
+  if (validAccums.length === 0) return c.json({ accumulation: null, daily: [], years_used: 0 })
+
+  const n = validAccums.length
+  const avgKey = (key: keyof YearAccum) => validAccums.reduce((s, a) => s + (a[key] as number), 0) / n
+  const r1 = (v: number) => Math.round(v * 10) / 10
+
+  const accumulation = {
+    temp_sum: r1(avgKey("temp_sum")),
+    sunshine_sum: r1(avgKey("sunshine_sum")),
+    precip_sum: r1(avgKey("precip_sum")),
+    effective_temp_sum: r1(avgKey("effective_temp_sum")),
+    et0_sum: r1(avgKey("et0_sum")),
+    water_balance: r1(avgKey("precip_sum") - avgKey("et0_sum")),
+    wind_max_peak: r1(Math.max(...validAccums.map(a => a.wind_max_peak))),
+    wind_max_avg: r1(validAccums.reduce((s, a) => s + a.wind_max_sum / a.days, 0) / n),
+    strong_wind_days: Math.round(avgKey("strong_wind_days")),
+    base_temp: baseTemp, from: start, to: end,
+    days: Math.round(avgKey("days")),
+  }
+
+  // Build daily averages with current-year dates
+  const sMs = Date.parse(start + "T00:00:00Z")
+  const avgArr = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length
+  const daily: Omit<DailyWeatherRow, "municipality_code" | "fetched_at">[] = []
+  for (let i = 0; i < totalDays; i++) {
+    const dv = dayValues.get(i)
+    if (!dv || dv.temp_mean.length === 0) continue
+    daily.push({
+      date: new Date(sMs + i * 86400000).toISOString().slice(0, 10),
+      temp_mean: r1(avgArr(dv.temp_mean)), temp_max: r1(avgArr(dv.temp_max)), temp_min: r1(avgArr(dv.temp_min)),
+      precip_sum: r1(avgArr(dv.precip_sum)), sunshine_h: r1(avgArr(dv.sunshine_h)),
+      et0: r1(avgArr(dv.et0)), wind_max: r1(avgArr(dv.wind_max)), weather_code: 0,
+    })
+  }
+
+  cacheHeader(c, end)
+  return c.json({ accumulation, daily, years_used: n })
+})
+
 export { app as weatherRoutes }

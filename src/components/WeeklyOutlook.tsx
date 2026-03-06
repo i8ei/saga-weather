@@ -5,12 +5,13 @@ interface Props {
   forecast: ForecastDay[]
   accum: Accumulation | null
   prevAccum: Accumulation | null
+  normalAccum?: Accumulation | null
 }
 
-export default function WeeklyOutlook({ forecast, accum, prevAccum }: Props) {
+export default function WeeklyOutlook({ forecast, accum, prevAccum, normalAccum }: Props) {
   if (forecast.length === 0) return null
 
-  const insights = generateInsights(forecast, accum, prevAccum)
+  const insights = generateInsights(forecast, accum, prevAccum, normalAccum)
   if (insights.length === 0) return null
 
   return (

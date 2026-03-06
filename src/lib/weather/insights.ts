@@ -6,6 +6,7 @@ export function generateInsights(
   forecast: ForecastDay[],
   accum: Accumulation | null,
   prevAccum: Accumulation | null,
+  normalAccum?: Accumulation | null,
 ): InsightItem[] {
   const items: InsightItem[] = []
 
@@ -23,23 +24,31 @@ export function generateInsights(
     items.push({ text: `強風の日あり（最大${maxWind} m/s）`, level: 'warn' })
   }
 
-  // 3. Temperature trend (accum vs prevAccum)
-  if (accum && prevAccum && accum.days > 0 && prevAccum.days > 0) {
-    const avgDiff = accum.temp_sum / accum.days - prevAccum.temp_sum / prevAccum.days
-    if (avgDiff > 1.5) {
-      items.push({ text: 'この期間は前年より暖かめ', level: 'info' })
-    } else if (avgDiff < -1.5) {
-      items.push({ text: 'この期間は前年より涼しめ', level: 'info' })
+  // 3. Temperature trend — prefer normal (平年) over prev (前年)
+  if (accum && accum.days > 0) {
+    const ref = normalAccum ?? prevAccum
+    const label = normalAccum ? '平年' : '前年'
+    if (ref && ref.days > 0) {
+      const avgDiff = accum.temp_sum / accum.days - ref.temp_sum / ref.days
+      if (avgDiff > 1.5) {
+        items.push({ text: `この期間は${label}より暖かめ`, level: 'info' })
+      } else if (avgDiff < -1.5) {
+        items.push({ text: `この期間は${label}より涼しめ`, level: 'info' })
+      }
     }
   }
 
-  // 4. Water balance trend
-  if (accum && prevAccum) {
-    const wbDiff = accum.water_balance - prevAccum.water_balance
-    if (wbDiff > 30) {
-      items.push({ text: '土壌水分はやや多めの傾向', level: 'info' })
-    } else if (wbDiff < -30) {
-      items.push({ text: '乾燥傾向', level: 'warn' })
+  // 4. Water balance trend — prefer normal over prev
+  if (accum) {
+    const ref = normalAccum ?? prevAccum
+    const label = normalAccum ? '平年' : '前年'
+    if (ref) {
+      const wbDiff = accum.water_balance - ref.water_balance
+      if (wbDiff > 30) {
+        items.push({ text: `土壌水分は${label}よりやや多めの傾向`, level: 'info' })
+      } else if (wbDiff < -30) {
+        items.push({ text: '乾燥傾向', level: 'warn' })
+      }
     }
   }
 

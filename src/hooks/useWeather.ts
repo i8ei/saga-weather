@@ -150,6 +150,34 @@ export function useAccumulation(from?: string, to?: string, mc?: string) {
   return { data, error, loading }
 }
 
+export interface NormalData {
+  daily: DailyWeather[]
+  accumulation: Accumulation | null
+  years_used: number
+}
+
+/** 過去5年平均（前年除く）を取得 */
+export function useWeatherNormal(from?: string, to?: string, mc?: string) {
+  const [data, setData] = useState<NormalData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!from || !to || !mc) { setData(null); setLoading(false); return }
+    setLoading(true)
+    setError(null)
+    const ac = new AbortController()
+    const params = new URLSearchParams({ from, to, mc })
+    fetch(`/api/weather/normal?${params}`, { signal: ac.signal })
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then((d) => { setData(d); setLoading(false) })
+      .catch((e) => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false) } })
+    return () => ac.abort()
+  }, [from, to, mc])
+
+  return { data, error, loading }
+}
+
 /** daily + accumulation を1リクエストで取得 */
 export function useWeatherBundle(from?: string, to?: string, mc?: string) {
   const [daily, setDaily] = useState<DailyWeather[]>([])

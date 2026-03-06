@@ -2,16 +2,13 @@ import type { Accumulation } from '../../hooks/useWeather'
 import Tooltip from '../Tooltip'
 import { evaluateAccum } from '../../lib/weather/evaluators'
 
-function Diff({ curr, prev, unit, invert }: { curr: number; prev: number; unit: string; invert?: boolean }) {
+function Diff({ curr, prev, unit, color: fixedColor }: { curr: number; prev: number; unit: string; color?: string }) {
   const diff = curr - prev
   if (diff === 0) return null
   const sign = diff > 0 ? "+" : ""
-  // invert: for wind days, more = worse, so positive diff is warn color
-  const color = invert
-    ? (diff > 0 ? "var(--warn)" : "#f59e0b")
-    : (diff > 0 ? "#f59e0b" : "#f59e0b")
+  const c = fixedColor ?? "#f59e0b"
   return (
-    <span style={{ color, fontSize: 12, marginLeft: 6 }}>
+    <span style={{ color: c, fontSize: 12, marginLeft: 6 }}>
       {sign}{diff.toLocaleString()} {unit}
     </span>
   )
@@ -20,6 +17,7 @@ function Diff({ curr, prev, unit, invert }: { curr: number; prev: number; unit: 
 interface Props {
   data: Accumulation | null
   prevData?: Accumulation | null
+  normalData?: Accumulation | null
   rangeLabel?: string
   defaultFrom: string
   defaultTo: string
@@ -40,7 +38,7 @@ const dateInputStyle: React.CSSProperties = {
   colorScheme: "dark",
 }
 
-export default function AccumulationCards({ data, prevData, rangeLabel, defaultFrom, defaultTo, customFrom, customTo, minDate, onFromChange, onToChange }: Props) {
+export default function AccumulationCards({ data, prevData, normalData, rangeLabel, defaultFrom, defaultTo, customFrom, customTo, minDate, onFromChange, onToChange }: Props) {
   const isCustom = customFrom !== null || customTo !== null
   const activeFrom = customFrom ?? defaultFrom
   const activeTo = customTo ?? defaultTo
@@ -49,6 +47,7 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
 
   // 前年データの日数が今年の80%未満なら比較に使わない（データ不足）
   const hasPrev = prevData != null && data.days > 0 && prevData.days >= data.days * 0.8
+  const hasNormal = normalData != null && data.days > 0 && normalData.days >= data.days * 0.5
 
   const rows: { label: string; desc: string; value: string; unit: string; sub?: string; diffKey?: keyof Accumulation; diffUnit?: string; invert?: boolean }[] = [
     {
@@ -152,11 +151,26 @@ export default function AccumulationCards({ data, prevData, rangeLabel, defaultF
                     curr={Number(data[r.diffKey])}
                     prev={Number(prevData[r.diffKey])}
                     unit={r.diffUnit ?? r.unit}
-                    invert={r.invert}
+
                   />
                   {(() => {
                     const ev = evaluateAccum(r.diffKey, data, prevData)
-                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.color }}>{ev.text}</span> : null
+                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.text === '並み' ? 'var(--text-sub)' : '#f59e0b' }}>{ev.text}</span> : null
+                  })()}
+                </>
+              )}
+              {hasNormal && normalData && r.diffKey && (
+                <>
+                  <Diff
+                    curr={Number(data[r.diffKey])}
+                    prev={Number(normalData[r.diffKey])}
+                    unit={r.diffUnit ?? r.unit}
+
+                    color="#a78bfa"
+                  />
+                  {(() => {
+                    const ev = evaluateAccum(r.diffKey, data, normalData)
+                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.text === '並み' ? 'var(--text-sub)' : '#a78bfa' }}>{ev.text}</span> : null
                   })()}
                 </>
               )}
