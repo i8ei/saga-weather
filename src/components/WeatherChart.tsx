@@ -78,8 +78,8 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
   const prevSufficient = prevData && prevData.length >= data.length * 0.8
   const normalSufficient = normalData && normalData.length >= data.length * 0.5
 
-  // Reset selection on data/metric change
-  useEffect(() => { setSelectedIdx(null) }, [data, metric])
+  // Reset selection on data/metric/comparison change (-cdx fix #3)
+  useEffect(() => { setSelectedIdx(null) }, [data, metric, prevData, normalData])
 
   const chartData = useMemo(() => {
     if (data.length === 0) return null
@@ -277,8 +277,8 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
   const { posPath, negPath, overlayPath, thLines, yTicks, dateTicks, months,
     zeroY, rawMin, prevPath, normalPath, barW, prevValues, normalValues } = chartData
 
-  // Tooltip content builder
-  const tooltipContent = selectedIdx !== null ? (() => {
+  // Tooltip content builder (-cdx fix #1: bounds guard, fix #2: != null)
+  const tooltipContent = selectedIdx !== null && selectedIdx < data.length ? (() => {
     const d = data[selectedIdx]
     const dt = new Date(d.date + "T00:00:00")
     const dayName = DAY_NAMES[dt.getDay()]
@@ -300,11 +300,11 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
     }
 
     const pv = prevValues[selectedIdx]
-    if (prevSufficient && pv !== null) {
+    if (prevSufficient && pv != null) {
       lines.push(`前年: ${pv.toFixed(1)}${config.unit}`)
     }
     const nv = normalValues[selectedIdx]
-    if (normalSufficient && nv !== null) {
+    if (normalSufficient && nv != null) {
       lines.push(`平年: ${nv.toFixed(1)}${config.unit}`)
     }
 
@@ -312,10 +312,11 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
   })() : null
 
   // Tooltip horizontal position (percentage of SVG width)
-  const tooltipLeft = selectedIdx !== null
+  const tooltipLeftPct = selectedIdx !== null
     ? ((PAD_LEFT + (selectedIdx + 0.5) * barW) / W) * 100
     : 0
-  const flipLeft = tooltipLeft > 70
+  // Flip when bar is in right 30% of chart (Claude fix #4: overflow guard)
+  const flipLeft = tooltipLeftPct > 70
 
   return (
     <section className="card">
@@ -329,14 +330,16 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
       </h2>
 
       <div style={{ position: "relative" }}>
-        {/* HTML Tooltip */}
+        {/* HTML Tooltip (-gmn fix #5: bottom positioning, Claude fix #4: maxWidth+overflow) */}
         {selectedIdx !== null && tooltipContent && (
           <div
             style={{
               position: "absolute",
-              top: 0,
-              left: `${tooltipLeft}%`,
-              transform: flipLeft ? "translateX(-100%)" : "translateX(0)",
+              bottom: "100%",
+              marginBottom: 4,
+              left: flipLeft ? "auto" : `${tooltipLeftPct}%`,
+              right: flipLeft ? `${100 - tooltipLeftPct}%` : "auto",
+              maxWidth: "80%",
               background: "var(--bg, #1a1a2e)",
               border: "1px solid var(--accent, #4cc9f0)",
               borderRadius: 4,
