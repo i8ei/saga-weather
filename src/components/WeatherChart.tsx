@@ -100,9 +100,11 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
 
     const prevNonNull = prevSufficient ? prevValues.filter((v): v is number => v !== null) : []
     const allValues = [...values, ...(overlayValues ?? []), ...prevNonNull]
+    if (allValues.length === 0) return null
     const thresholdValues = config.thresholds?.map((t) => t.value) ?? []
-    let rawMax = Math.max(...allValues, ...thresholdValues, 0.1)
-    const rawMin = config.allowNegativeMin ? Math.min(...allValues, 0) : 0
+    const combined = [...allValues, ...thresholdValues]
+    let rawMax = Math.max(...combined, 0.1)
+    const rawMin = config.allowNegativeMin ? Math.min(...combined, 0) : 0
 
     // Clamp y-axis max to 95th percentile to prevent spike compression
     if (config.clampScale && allValues.length >= 10) {
@@ -262,6 +264,8 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
         viewBox={`0 0 ${W} ${H + 6}`}
         style={{ width: "100%", height: "auto", marginTop: 8, display: "block" }}
         preserveAspectRatio="none"
+        role="img"
+        aria-label={`${config.label}チャート（${rangeLabel ?? "期間"}）`}
       >
         {/* Y-axis grid + labels */}
         {yTicks.map((t, i) => (

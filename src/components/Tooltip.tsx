@@ -26,12 +26,17 @@ export default function Tooltip({ text, children }: TooltipProps) {
     <span
       ref={ref}
       className="tooltip-wrap"
+      tabIndex={0}
+      role="button"
+      aria-describedby={show ? "tooltip" : undefined}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      onFocus={() => setShow(true)}
+      onBlur={() => setShow(false)}
       onClick={() => setShow((s) => !s)}
     >
       {children}
-      {show && <span className="tooltip-box">{text}</span>}
+      {show && <span className="tooltip-box" role="tooltip" id="tooltip">{text}</span>}
     </span>
   )
 }

@@ -160,7 +160,7 @@ export interface NormalData {
 export function useWeatherNormal(from?: string, to?: string, mc?: string) {
   const [data, setData] = useState<NormalData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!from || !to || !mc) { setData(null); setLoading(false); return }

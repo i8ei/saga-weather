@@ -42,6 +42,7 @@ app.post("/api/admin/backfill", async (c) => {
   const to = c.req.query("to")
   if (!from || !to) return c.json({ error: "from and to required" }, 400)
   if (!isValidDate(from) || !isValidDate(to)) return c.json({ error: "Invalid date format" }, 400)
+  if (from > to) return c.json({ error: "from must be <= to" }, 400)
   if (daysBetween(from, to) > 400) return c.json({ error: "Range too large (max 400 days)" }, 400)
   const result = await backfill(c.env, from, to)
   return c.json(result)

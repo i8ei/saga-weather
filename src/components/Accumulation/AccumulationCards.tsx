@@ -115,6 +115,7 @@ export default function AccumulationCards({ data, prevData, normalData, rangeLab
             type="date"
             value={activeFrom}
             min={minDate ?? undefined}
+            max={activeTo}
             onChange={(e) => onFromChange(e.target.value || null)}
             style={dateInputStyle}
           />
@@ -122,6 +123,7 @@ export default function AccumulationCards({ data, prevData, normalData, rangeLab
           <input
             type="date"
             value={activeTo}
+            min={activeFrom}
             max={new Date().toISOString().slice(0, 10)}
             onChange={(e) => onToChange(e.target.value || null)}
             style={dateInputStyle}
@@ -155,7 +157,7 @@ export default function AccumulationCards({ data, prevData, normalData, rangeLab
                   />
                   {(() => {
                     const ev = evaluateAccum(r.diffKey, data, prevData)
-                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.text === '並み' ? 'var(--text-sub)' : '#f59e0b' }}>{ev.text}</span> : null
+                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.level === 'neutral' ? 'var(--text-sub)' : '#f59e0b' }}>{ev.text}</span> : null
                   })()}
                 </>
               )}
@@ -170,7 +172,7 @@ export default function AccumulationCards({ data, prevData, normalData, rangeLab
                   />
                   {(() => {
                     const ev = evaluateAccum(r.diffKey, data, normalData)
-                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.text === '並み' ? 'var(--text-sub)' : '#a78bfa' }}>{ev.text}</span> : null
+                    return ev ? <span className="jp" style={{ fontSize: 11, marginLeft: 6, color: ev.level === 'neutral' ? 'var(--text-sub)' : '#a78bfa' }}>{ev.text}</span> : null
                   })()}
                 </>
               )}

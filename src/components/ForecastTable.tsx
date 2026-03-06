@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import React, { useMemo } from "react"
 import type { ForecastDay } from "../hooks/useWeather"
 import { wmoToIcon } from "../lib/weather-icons"
 import { getKoIndex, KO_72, getMoonPhase, moonPhaseIcon } from "../lib/sekki-data"
@@ -39,9 +39,9 @@ export default function ForecastTable({ forecast, now }: Props) {
             const dayIdx = dt.getDay()
             const isWeekend = dayIdx === 0 || dayIdx === 6
             return (
-              <>
+              <React.Fragment key={day.date}>
                 {transition && (
-                  <tr key={`ko-${day.date}`}>
+                  <tr>
                     <td
                       colSpan={7}
                       style={{
@@ -59,7 +59,6 @@ export default function ForecastTable({ forecast, now }: Props) {
                   </tr>
                 )}
                 <tr
-                  key={day.date}
                   style={{
                     borderBottom: "1px solid var(--line)",
                     background: isToday ? "var(--accent-bg, rgba(100,200,255,0.08))" : "transparent",
@@ -92,7 +91,7 @@ export default function ForecastTable({ forecast, now }: Props) {
                     {moonPhaseIcon(getMoonPhase(dt))}
                   </td>
                 </tr>
-              </>
+              </React.Fragment>
             )
           })}
         </tbody>
