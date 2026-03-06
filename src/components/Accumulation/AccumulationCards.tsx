@@ -138,11 +138,11 @@ export default function AccumulationCards({ data, prevData, normalData, rangeLab
           )}
         </div>
       </div>
-      <div className="terminal-block mono" style={{ marginTop: 10 }}>
+      <div className={`terminal-block mono${hasPrev && hasNormal ? ' accum-dense' : ''}`} style={{ marginTop: 10 }}>
         {rows.map((r) => (
           <div key={r.label} style={{ padding: "4px 0", borderBottom: "1px solid var(--line)" }}>
             <div className="row" style={{ alignItems: "baseline" }}>
-              <Tooltip text={r.desc}><span className="jp">{r.label}</span></Tooltip>
+              <Tooltip text={r.desc}><span className="jp accum-label">{r.label}</span></Tooltip>
               <span className="mono muted" style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap" }}>
                 ................................................................
               </span>
