@@ -5,6 +5,7 @@ import ForecastTable from "./components/ForecastTable"
 import AccumulationCards from "./components/Accumulation/AccumulationCards"
 import WeatherChart, { type Metric } from "./components/WeatherChart"
 import WeeklyOutlook from "./components/WeeklyOutlook"
+import About from "./components/About"
 
 type Range = "1y" | "6m" | "3m" | "1m"
 
@@ -65,6 +66,7 @@ export default function App() {
   const [showNormal, setShowNormal] = useState(false)
   const [accumFrom, setAccumFrom] = useState<string | null>(null)
   const [accumTo, setAccumTo] = useState<string | null>(null)
+  const [showAbout, setShowAbout] = useState(false)
 
   // Resolve municipality from URL path
   useEffect(() => {
@@ -295,8 +297,19 @@ export default function App() {
         )}
       </div>
 
+      {showAbout && <About onClose={() => setShowAbout(false)} />}
+
       <footer className="mono muted" style={{ textAlign: "center", fontSize: 10, padding: "20px 0 10px" }}>
-        気象データ提供: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-sub)" }}>Open-Meteo.com</a>
+        <button
+          className="mono muted"
+          onClick={() => setShowAbout((v) => !v)}
+          style={{ background: "none", border: "none", fontSize: 10, padding: 0, cursor: "pointer", textDecoration: "underline" }}
+        >
+          About
+        </button>
+        <span style={{ margin: "0 8px" }}>|</span>
+        気象データ: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-sub)" }}>Open-Meteo.com</a>
+        <span style={{ margin: "0 8px" }}>|</span>Built by Circulart
       </footer>
     </div>
   )
