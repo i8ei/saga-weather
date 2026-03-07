@@ -271,8 +271,11 @@ app.get("/normal", async (c) => {
   const daily: Omit<DailyWeatherRow, "municipality_code" | "fetched_at">[] = []
   for (const [md, dv] of dayValues) {
     if (dv.temp_mean.length === 0) continue
+    const y = crossesYear && md < startMd ? startYear + 1 : startYear
+    // Skip Feb 29 if target year is not a leap year
+    if (md === "02-29" && new Date(y, 1, 29).getDate() !== 29) continue
     daily.push({
-      date: `${crossesYear && md < startMd ? startYear + 1 : startYear}-${md}`,
+      date: `${y}-${md}`,
       temp_mean: r1(avgArr(dv.temp_mean)), temp_max: r1(avgArr(dv.temp_max)), temp_min: r1(avgArr(dv.temp_min)),
       precip_sum: r1(avgArr(dv.precip_sum)), sunshine_h: r1(avgArr(dv.sunshine_h)),
       et0: r1(avgArr(dv.et0)), wind_max: r1(avgArr(dv.wind_max)), weather_code: 0,
