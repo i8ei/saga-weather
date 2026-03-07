@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import type { DailyWeather } from '../hooks/useWeather'
 
 type Metric = "temp" | "sunshine" | "precip" | "water" | "wind"
@@ -70,7 +70,7 @@ interface Props {
   rangeLabel?: string
 }
 
-export default function WeatherChart({ data, prevData, normalData, metric, rangeLabel }: Props) {
+export default memo(function WeatherChart({ data, prevData, normalData, metric, rangeLabel }: Props) {
   const config = METRIC_CONFIG[metric]
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -145,8 +145,8 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
     const zeroY = toY(0)
 
     // Build combined <path> d-strings for positive and negative bars
-    let posPath = ""
-    let negPath = ""
+    const posSegs: string[] = []
+    const negSegs: string[] = []
     for (let i = 0; i < values.length; i++) {
       const x = toX(i)
       const y = toY(values[i])
@@ -157,11 +157,13 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
       const rw = barW * 0.8
       const seg = `M${rx},${rectY}h${rw}v${rectH}h${-rw}Z`
       if (barH < 0) {
-        negPath += seg
+        negSegs.push(seg)
       } else {
-        posPath += seg
+        posSegs.push(seg)
       }
     }
+    const posPath = posSegs.join("")
+    const negPath = negSegs.join("")
 
     // Build line path for overlay
     let overlayPath = ""
@@ -485,6 +487,6 @@ export default function WeatherChart({ data, prevData, normalData, metric, range
       )}
     </section>
   )
-}
+})
 
 export type { Metric }

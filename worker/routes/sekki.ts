@@ -8,8 +8,12 @@ app.get("/sekki", async (c) => {
   url.pathname = "/data/sekki.json"
   const assetResp = await c.env.ASSETS.fetch(new Request(url.toString()))
   if (!assetResp.ok) return c.json({ error: "sekki.json not found" }, 404)
-  const data = await assetResp.json()
-  return c.json(data)
+  return new Response(assetResp.body, {
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "public, max-age=86400, s-maxage=604800",
+    },
+  })
 })
 
 export { app as sekkiRoutes }

@@ -1,9 +1,9 @@
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { SEKKI_24, getSekkiIndex, getMoonPhase, moonPhaseIcon } from "../lib/sekki-data"
 
 const SYNODIC_MONTH = 29.530588
 
-export default function SekkiHeader({ now }: { now: Date }) {
+export default memo(function SekkiHeader({ now }: { now: Date }) {
   const sekkiIdx = useMemo(() => getSekkiIndex(now), [now])
   const moonPhase = useMemo(() => getMoonPhase(now), [now])
 
@@ -27,4 +27,4 @@ export default function SekkiHeader({ now }: { now: Date }) {
       </div>
     </header>
   )
-}
+})

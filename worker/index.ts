@@ -36,6 +36,18 @@ app.post("/api/admin/ingest", async (c) => {
   return c.json({ ok: true })
 })
 
+// Run migrations (#5: add date index)
+app.post("/api/admin/migrate", async (c) => {
+  const results: string[] = []
+  try {
+    await c.env.DB.exec("CREATE INDEX IF NOT EXISTS idx_daily_weather_date ON daily_weather(date)")
+    results.push("idx_daily_weather_date: OK")
+  } catch (e) {
+    results.push(`idx_daily_weather_date: ${e instanceof Error ? e.message : String(e)}`)
+  }
+  return c.json({ results })
+})
+
 // Backfill: POST /api/admin/backfill?from=2024-03-06&to=2024-06-03
 app.post("/api/admin/backfill", async (c) => {
   const from = c.req.query("from")

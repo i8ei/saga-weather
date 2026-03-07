@@ -2,6 +2,48 @@ const ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 const DAILY_PARAMS = "temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,sunshine_duration,weather_code,et0_fao_evapotranspiration,wind_speed_10m_max"
 
+/** Fetch with timeout (8s) and retry (up to maxRetries, exponential backoff 1s→2s) */
+async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) })
+      if (resp.ok) return resp
+      // Retry on 429 or 5xx
+      if (resp.status === 429 || resp.status >= 500) {
+        const body = await resp.text().catch(() => "")
+        const snippet = body.slice(0, 200)
+        console.error(`Open-Meteo ${resp.status} (attempt ${attempt + 1}/${maxRetries + 1}): ${snippet}`)
+        lastError = new Error(`Open-Meteo error: ${resp.status}`)
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
+          continue
+        }
+        throw lastError
+      }
+      // Non-retryable error (4xx except 429)
+      const body = await resp.text().catch(() => "")
+      throw new Error(`Open-Meteo error: ${resp.status} — ${body.slice(0, 200)}`)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "TimeoutError") {
+        console.error(`Open-Meteo timeout (attempt ${attempt + 1}/${maxRetries + 1})`)
+        lastError = new Error("Open-Meteo request timed out")
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
+          continue
+        }
+      }
+      // Re-throw if it's our own Error (non-retryable) or final attempt
+      if (lastError && attempt >= maxRetries) throw lastError
+      if (err instanceof Error && err.message.startsWith("Open-Meteo error:")) throw err
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (attempt >= maxRetries) throw lastError
+      await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
+    }
+  }
+  throw lastError ?? new Error("Open-Meteo fetch failed")
+}
+
 /** Open-Meteo daily response fields (shared by Forecast & Archive APIs) */
 interface DailyResponse {
   time: string[]
@@ -71,8 +113,7 @@ export async function fetchDailyRange(lat: string, lon: string, startDate: strin
     start_date: startDate,
     end_date: endDate,
   })
-  const resp = await fetch(`${FORECAST_URL}?${params}`)
-  if (!resp.ok) throw new Error(`Open-Meteo error: ${resp.status}`)
+  const resp = await fetchWithRetry(`${FORECAST_URL}?${params}`)
   const data = await resp.json<OpenMeteoResult<DailyResponse>>()
   return parseDailyData(data.daily)
 }
@@ -87,8 +128,7 @@ export async function fetchDailyRangeMulti(lats: string, lons: string, startDate
     start_date: startDate,
     end_date: endDate,
   })
-  const resp = await fetch(`${FORECAST_URL}?${params}`)
-  if (!resp.ok) throw new Error(`Open-Meteo multi error: ${resp.status}`)
+  const resp = await fetchWithRetry(`${FORECAST_URL}?${params}`)
   const data = await resp.json() as OpenMeteoResult<DailyResponse>[] | OpenMeteoResult<DailyResponse>
   if (Array.isArray(data)) {
     return data.map((d) => parseDailyData(d.daily))
@@ -106,8 +146,7 @@ export async function fetchArchiveMulti(lats: string, lons: string, startDate: s
     start_date: startDate,
     end_date: endDate,
   })
-  const resp = await fetch(`${ARCHIVE_URL}?${params}`)
-  if (!resp.ok) throw new Error(`Open-Meteo archive error: ${resp.status}`)
+  const resp = await fetchWithRetry(`${ARCHIVE_URL}?${params}`)
   const data = await resp.json() as OpenMeteoResult<DailyResponse>[] | OpenMeteoResult<DailyResponse>
   if (Array.isArray(data)) {
     return data.map((d) => parseDailyData(d.daily))
@@ -153,8 +192,7 @@ export async function fetchForecast(lat: string, lon: string): Promise<ForecastD
     timezone: "Asia/Tokyo",
     forecast_days: "8",
   })
-  const resp = await fetch(`${FORECAST_URL}?${params}`)
-  if (!resp.ok) throw new Error(`Open-Meteo forecast error: ${resp.status}`)
+  const resp = await fetchWithRetry(`${FORECAST_URL}?${params}`)
   const data = await resp.json<OpenMeteoResult<ForecastDailyResponse>>()
   return parseForecastData(data.daily)
 }
@@ -168,8 +206,7 @@ export async function fetchForecastMulti(lats: string, lons: string): Promise<Fo
     timezone: "Asia/Tokyo",
     forecast_days: "8",
   })
-  const resp = await fetch(`${FORECAST_URL}?${params}`)
-  if (!resp.ok) throw new Error(`Open-Meteo forecast multi error: ${resp.status}`)
+  const resp = await fetchWithRetry(`${FORECAST_URL}?${params}`)
   const data = await resp.json() as OpenMeteoResult<ForecastDailyResponse>[] | OpenMeteoResult<ForecastDailyResponse>
   if (Array.isArray(data)) {
     return data.map((d) => parseForecastData(d.daily))
