@@ -210,9 +210,10 @@ app.get("/normal", async (c) => {
   }
 
   // Filter valid ranges and compute daily averages + accumulation
+  const startYear = parseInt(start.slice(0, 4))
   const startMd = start.slice(5) // "MM-DD"
-  const endMd = end.slice(5)
-  const crossesYear = endMd < startMd
+  const endYear = parseInt(end.slice(0, 4))
+  const crossesYear = endYear > startYear
   const r1 = (v: number) => Math.round(v * 10) / 10
 
   interface RangeAccum { temp_sum: number; sunshine_sum: number; precip_sum: number; effective_temp_sum: number; et0_sum: number; wind_max_peak: number; wind_max_sum: number; strong_wind_days: number; days: number }
@@ -266,7 +267,6 @@ app.get("/normal", async (c) => {
   }
 
   // Build daily averages with current-year dates, sorted correctly
-  const startYear = parseInt(start.slice(0, 4))
   const avgArr = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length
   const daily: Omit<DailyWeatherRow, "municipality_code" | "fetched_at">[] = []
   for (const [md, dv] of dayValues) {
