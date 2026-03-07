@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from "react"
+import React, { useMemo } from "react"
 import type { ForecastDay } from "../hooks/useWeather"
 import { wmoToIcon } from "../lib/weather-icons"
 import { getKoIndex, KO_72, getMoonPhase, moonPhaseIcon } from "../lib/sekki-data"
@@ -11,7 +11,7 @@ interface Props {
   now: Date
 }
 
-export default memo(function ForecastTable({ forecast, now }: Props) {
+export default function ForecastTable({ forecast, now }: Props) {
   const days = forecast.slice(0, 5)
   const todayStr = useMemo(() => {
     const d = startOfLocalDay(now)
@@ -20,15 +20,15 @@ export default memo(function ForecastTable({ forecast, now }: Props) {
 
   if (days.length === 0) return null
 
-  // 各日の候indexを計算し、変わり目を検出（useMemoで天文計算キャッシュ）
-  const rows = useMemo(() => days.map((d, i) => {
+  // 各日の候indexを計算し、変わり目を検出
+  const rows = days.map((d, i) => {
     const dt = new Date(d.date + "T00:00:00")
     const koIdx = getKoIndex(dt)
     const prevKoIdx = i > 0
       ? getKoIndex(new Date(days[i - 1].date + "T00:00:00"))
       : getKoIndex(new Date(dt.getTime() - 86400000))
     return { day: d, dt, koIdx, transition: koIdx !== prevKoIdx }
-  }), [days])
+  })
 
   return (
     <section className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -98,4 +98,4 @@ export default memo(function ForecastTable({ forecast, now }: Props) {
       </table>
     </section>
   )
-})
+}

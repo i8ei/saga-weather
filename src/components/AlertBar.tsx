@@ -1,11 +1,10 @@
-import { memo } from "react"
 import type { ForecastDay } from "../hooks/useWeather"
 
 interface Props {
   forecast: ForecastDay[]
 }
 
-export default memo(function AlertBar({ forecast }: Props) {
+export default function AlertBar({ forecast }: Props) {
   if (forecast.length === 0) return null
 
   const today = forecast[0]
@@ -40,4 +39,4 @@ export default memo(function AlertBar({ forecast }: Props) {
         : badge(true, `散布注意 風${today.wind_max.toFixed(1)}m/s`)}
     </div>
   )
-})
+}

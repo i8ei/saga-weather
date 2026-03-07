@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import type { DailyWeather } from '../hooks/useWeather'
 
 type Metric = "temp" | "sunshine" | "precip" | "water" | "wind"
@@ -70,7 +70,7 @@ interface Props {
   rangeLabel?: string
 }
 
-export default memo(function WeatherChart({ data, prevData, normalData, metric, rangeLabel }: Props) {
+export default function WeatherChart({ data, prevData, normalData, metric, rangeLabel }: Props) {
   const config = METRIC_CONFIG[metric]
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -487,6 +487,6 @@ export default memo(function WeatherChart({ data, prevData, normalData, metric, 
       )}
     </section>
   )
-})
+}
 
 export type { Metric }
