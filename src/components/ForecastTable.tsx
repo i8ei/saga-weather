@@ -22,10 +22,10 @@ export default function ForecastTable({ forecast, now }: Props) {
 
   // 各日の候indexを計算し、変わり目を検出
   const rows = days.map((d, i) => {
-    const dt = new Date(d.date + "T00:00:00")
+    const dt = new Date(d.date + "T12:00:00")
     const koIdx = getKoIndex(dt)
     const prevKoIdx = i > 0
-      ? getKoIndex(new Date(days[i - 1].date + "T00:00:00"))
+      ? getKoIndex(new Date(days[i - 1].date + "T12:00:00"))
       : getKoIndex(new Date(dt.getTime() - 86400000))
     return { day: d, dt, koIdx, transition: koIdx !== prevKoIdx }
   })

@@ -78,9 +78,9 @@ export function moonPhaseIcon(phase: number): string {
   if (phase < 0.125) return "🌑";
   if (phase < 0.25) return "🌒";
   if (phase < 0.375) return "🌓";
-  if (phase < 0.5) return "🌔";
-  if (phase < 0.625) return "🌕";
-  if (phase < 0.75) return "🌖";
+  if (phase < 0.4375) return "🌔";
+  if (phase < 0.5625) return "🌕";
+  if (phase < 0.6875) return "🌖";
   if (phase < 0.875) return "🌗";
   return "🌘";
 }
