@@ -287,4 +287,16 @@ app.get("/normal", async (c) => {
   return c.json({ accumulation, daily, years_used: n })
 })
 
+// GET /status — system health and data coverage
+app.get("/status", async (c) => {
+  const row = await c.env.DB.prepare(
+    `SELECT MAX(date) as last_date, COUNT(DISTINCT date) as total_days FROM daily_weather`
+  ).first<{ last_date: string | null; total_days: number }>()
+  c.header("Cache-Control", "public, max-age=3600")
+  return c.json({
+    lastDate: row?.last_date ?? null,
+    totalDays: row?.total_days ?? 0,
+  })
+})
+
 export { app as weatherRoutes }

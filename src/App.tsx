@@ -55,6 +55,11 @@ function getMunicipalityNameFromPath(): string | null {
   }
 }
 
+interface SystemStatus {
+  lastDate: string | null
+  totalDays: number
+}
+
 export default function App() {
   const { data: municipalities, minDate, loading: muniLoading } = useMunicipalities()
   const [mc, setMc] = useState<string | null>(null)
@@ -67,6 +72,14 @@ export default function App() {
   const [accumFrom, setAccumFrom] = useState<string | null>(null)
   const [accumTo, setAccumTo] = useState<string | null>(null)
   const [showAbout, setShowAbout] = useState(false)
+  const [sysStatus, setSysStatus] = useState<SystemStatus | null>(null)
+
+  useEffect(() => {
+    fetch("/api/weather/status")
+      .then((r) => r.json() as Promise<SystemStatus>)
+      .then(setSysStatus)
+      .catch(() => {})
+  }, [])
 
   // Resolve municipality from URL path
   useEffect(() => {
@@ -299,17 +312,30 @@ export default function App() {
 
       {showAbout && <About onClose={() => setShowAbout(false)} />}
 
-      <footer className="mono muted" style={{ textAlign: "center", fontSize: 10, padding: "20px 0 10px" }}>
-        <button
-          className="mono muted"
-          onClick={() => setShowAbout((v) => !v)}
-          style={{ background: "none", border: "none", fontSize: 10, padding: 0, cursor: "pointer", textDecoration: "underline" }}
-        >
-          About
-        </button>
-        <span style={{ margin: "0 8px" }}>|</span>
-        気象データ: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-sub)" }}>Open-Meteo.com</a>
-        <span style={{ margin: "0 8px" }}>|</span>Built by Circulart
+      <footer className="mono muted" style={{ textAlign: "center", fontSize: 10, padding: "20px 0 10px", display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+        {sysStatus?.lastDate && (() => {
+          const [, m, d] = sysStatus.lastDate.split("-")
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+              <span style={{ background: "#16a34a", color: "#fff", padding: "1px 7px", borderRadius: 4, fontWeight: 600, fontSize: 10 }}>正常稼働中</span>
+              <span style={{ color: "var(--text-sub)" }}>
+                最終更新: {parseInt(m)}/{parseInt(d)} 6:00 · {sysStatus.totalDays}日分収集済み
+              </span>
+            </div>
+          )
+        })()}
+        <div>
+          <button
+            className="mono muted"
+            onClick={() => setShowAbout((v) => !v)}
+            style={{ background: "none", border: "none", fontSize: 10, padding: 0, cursor: "pointer", textDecoration: "underline" }}
+          >
+            About
+          </button>
+          <span style={{ margin: "0 8px" }}>·</span>
+          気象データ: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-sub)" }}>Open-Meteo.com</a>
+          <span style={{ margin: "0 8px" }}>·</span>Built by Circulart
+        </div>
       </footer>
     </div>
   )
